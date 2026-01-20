@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: true,
-      rollupTypes: true,
+      rollupTypes: false, // Disable rollup to avoid issues with global types like Blob, File
       exclude: ['tests/**/*', 'examples/**/*'],
     }),
   ],

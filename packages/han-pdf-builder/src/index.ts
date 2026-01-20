@@ -19,7 +19,6 @@ export * from './types/template.types';
 
 // Constants and enums
 export {
-  ErrorType,
   StylePreset
 } from './types';
 

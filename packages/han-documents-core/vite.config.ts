@@ -9,8 +9,11 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: true,
-      rollupTypes: true,
+      rollupTypes: false, // Disable rollup to avoid issues with global types like Blob, File
       exclude: ['**/*.test.ts'],
+      compilerOptions: {
+        lib: ['ES2020', 'DOM', 'DOM.Iterable']
+      }
     }),
   ],
   resolve: {
