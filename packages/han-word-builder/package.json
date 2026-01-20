@@ -1,0 +1,49 @@
+{
+  "name": "@han/docx-builder",
+  "version": "0.1.0",
+  "description": "Advanced Word document generator with TypeScript support",
+  "type": "module",
+  "main": "./dist/han-word.cjs.js",
+  "module": "./dist/han-word.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/han-word.es.js",
+      "require": "./dist/han-word.cjs.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "word",
+    "docx",
+    "typescript",
+    "document",
+    "generator"
+  ],
+  "author": "Han Documents Team",
+  "license": "MIT",
+  "dependencies": {
+    "docx": "^8.0.0",
+    "@han/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.2",
+    "vite": "^4.5.2",
+    "vite-plugin-dts": "^3.6.3",
+    "vitest": "^1.0.0",
+    "rimraf": "^5.0.0"
+  }
+}
+

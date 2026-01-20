@@ -1,0 +1,57 @@
+{
+  "name": "@han/pdf-builder",
+  "version": "0.1.0",
+  "description": "Advanced PDF document generator with TypeScript support",
+  "type": "module",
+  "main": "./dist/han-pdf.cjs.js",
+  "module": "./dist/han-pdf.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/han-pdf.es.js",
+      "require": "./dist/han-pdf.cjs.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "clean": "rimraf dist",
+    "example": "tsx examples/generate-pdf.ts"
+  },
+  "keywords": [
+    "pdf",
+    "typescript",
+    "document",
+    "generator"
+  ],
+  "author": "Han Documents Team",
+  "license": "MIT",
+  "dependencies": {
+    "@han/core": "workspace:*",
+    "file-saver": "^2.0.5",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.530",
+    "pdfkit": "^0.13.0",
+    "puppeteer": "^24.35.0"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^20.19.30",
+    "@types/pdfkit": "^0.17.4",
+    "i": "^0.3.7",
+    "rimraf": "^5.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.2",
+    "vite": "^4.5.2",
+    "vite-plugin-dts": "^3.6.3",
+    "vitest": "^1.0.0"
+  }
+}
