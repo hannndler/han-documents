@@ -3,7 +3,7 @@
  */
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { Result, success, error, ErrorType as CoreErrorType, IDocumentMetadata } from '@han/core';
+import { Result, success, error, ErrorType as CoreErrorType, IDocumentMetadata } from '@hannndler/core';
 import {
   IPDFReaderOptions,
   IJsonPDF,

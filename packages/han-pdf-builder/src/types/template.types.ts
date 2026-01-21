@@ -2,7 +2,7 @@
  * Template-specific type definitions for PDF Builder
  */
 
-import { Result } from '@han/core';
+import { Result } from '@hannndler/core';
 import { IPDFContentBlock } from './content.types';
 
 /**

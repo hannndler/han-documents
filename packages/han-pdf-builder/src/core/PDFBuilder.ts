@@ -14,7 +14,7 @@ import {
   IDocumentBuilder,
   IFileBuilder,
   IDownloadBuilder
-} from '@han/core';
+} from '@hannndler/core';
 import { ErrorType as LocalErrorType } from '../types/core.types';
 import { EventEmitter } from '../utils/EventEmitter';
 import { PDFPage } from './PDFPage';

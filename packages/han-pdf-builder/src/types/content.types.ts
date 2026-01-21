@@ -2,7 +2,7 @@
  * Content-specific type definitions for PDF Builder
  */
 
-import { Color } from '@han/core';
+import { Color } from '@hannndler/core';
 import { IPDFStyle } from './style.types';
 
 /**

@@ -2,7 +2,7 @@
  * Types for PDF Reader functionality
  */
 
-import { Result, IDocumentMetadata } from '@han/core';
+import { Result, IDocumentMetadata } from '@hannndler/core';
 
 /**
  * Output format types

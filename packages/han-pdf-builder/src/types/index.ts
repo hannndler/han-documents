@@ -9,5 +9,5 @@ export * from './style.types';
 export * from './builder.types';
 export * from './reader.types';
 export * from './template.types';
-// Note: Color is exported from core.types (re-exported from @han/core)
+// Note: Color is exported from core.types (re-exported from @hannndler/core)
 

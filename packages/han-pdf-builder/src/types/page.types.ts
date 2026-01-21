@@ -2,7 +2,7 @@
  * Page-specific type definitions for PDF Builder
  */
 
-import { Color } from '@han/core';
+import { Color } from '@hannndler/core';
 import { IPDFContentBlock } from './content.types';
 import { IPDFStyle } from './style.types';
 import { IBuildOptions } from './builder.types';
@@ -112,7 +112,7 @@ export interface IPDFPage {
 
 // Re-export types needed from content.types
 import type { ITableRow, IListItem, IImageContent, ITableContent, IListContent } from './content.types';
-import type { Result } from '@han/core';
+import type { Result } from '@hannndler/core';
 
 // Note: ITableRow and IListItem are defined in content.types.ts
 

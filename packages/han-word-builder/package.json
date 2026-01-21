@@ -36,7 +36,7 @@
   "license": "MIT",
   "dependencies": {
     "docx": "^8.0.0",
-    "@han/core": "workspace:*"
+    "@hannndler/core": "workspace:^"
   },
   "devDependencies": {
     "typescript": "^5.0.2",

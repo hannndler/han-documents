@@ -2,7 +2,7 @@
  * Style-specific type definitions for PDF Builder
  */
 
-import { Color } from '@han/core';
+import { Color } from '@hannndler/core';
 
 /**
  * Font configuration interface

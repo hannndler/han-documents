@@ -4,7 +4,7 @@
  */
 
 import PDFDocument from 'pdfkit';
-import { Result, success, error, ErrorType as CoreErrorType } from '@han/core';
+import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
 import {
   IPDFPage,
   IPDFPageConfig,

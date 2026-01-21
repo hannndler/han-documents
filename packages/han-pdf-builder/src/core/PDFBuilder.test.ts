@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFBuilder } from './PDFBuilder';
 import { PDFPage } from './PDFPage';
-import { ErrorType } from '@han/core';
+import { ErrorType } from '@hannndler/core';
 
 describe('PDFBuilder', () => {
   let builder: PDFBuilder;

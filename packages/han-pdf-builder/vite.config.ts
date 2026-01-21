@@ -22,7 +22,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'pdfkit',
-        '@han/core',
+        '@hannndler/core',
         'puppeteer',
         'pdf-lib',
         'pdfjs-dist',

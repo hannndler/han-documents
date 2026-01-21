@@ -6,7 +6,7 @@ import { PDFDocument } from 'pdf-lib';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - puppeteer types may not be available in all environments
 import puppeteer from 'puppeteer';
-import { Result, success, error, ErrorType as CoreErrorType } from '@han/core';
+import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
 import {
   ITemplateConfig,
   ITemplateData,

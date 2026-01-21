@@ -12,7 +12,7 @@ import {
   IError as CoreIError,
   ErrorType as CoreErrorType,
   Color as CoreColor
-} from '@han/core';
+} from '@hannndler/core';
 
 /**
  * Alias para compatibilidad con código existente

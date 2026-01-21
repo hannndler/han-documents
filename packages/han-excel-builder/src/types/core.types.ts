@@ -4,7 +4,7 @@
  */
 
 import { CellValue } from 'exceljs';
-import { Color } from '@han/core';
+import { Color } from '@hannndler/core';
 import { IWorkbookMetadata, Result, ErrorType, ISuccessResult, IErrorResult } from './compat.types';
 
 // Re-export tipos compartidos

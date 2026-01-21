@@ -3,5 +3,5 @@
  */
 
 export { WordBuilder } from './core/WordBuilder';
-export * from '@han/core';
+export * from '@hannndler/core';
 

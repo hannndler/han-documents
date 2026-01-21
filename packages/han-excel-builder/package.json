@@ -1,6 +1,6 @@
 {
-  "name": "@han/xlsx-builder",
-  "version": "2.0.0",
+  "name": "@hannndler/xlsx-builder",
+  "version": "2.0.3",
   "description": "Advanced Excel file generator with TypeScript support, comprehensive styling, and optimized performance",
   "type": "module",
   "main": "./dist/han-excel.cjs.js",
@@ -57,6 +57,9 @@
   ],
   "author": "Han Excel Team",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/hannndler/han-documents.git"
@@ -68,7 +71,7 @@
   "dependencies": {
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "@han/core": "workspace:*"
+    "@hannndler/core": "^0.1.1"
   },
   "peerDependencies": {
     "exceljs": "^4.4.0"
@@ -93,4 +96,3 @@
     "node": ">=16.0.0"
   }
 }
-

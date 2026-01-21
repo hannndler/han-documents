@@ -4,7 +4,7 @@
  */
 
 import ExcelJS from 'exceljs';
-import { Result, success, error, ErrorType as CoreErrorType } from '@han/core';
+import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
 import {
   IWorksheet,
   IWorksheetConfig,

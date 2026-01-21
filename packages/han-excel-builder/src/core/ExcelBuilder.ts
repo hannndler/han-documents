@@ -35,7 +35,7 @@ import {
   IDocumentBuilder,
   IFileBuilder,
   IDownloadBuilder
-} from '@han/core';
+} from '@hannndler/core';
 import { EventEmitter } from '../utils/EventEmitter';
 import { Worksheet } from './Worksheet';
 import {

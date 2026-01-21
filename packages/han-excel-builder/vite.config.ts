@@ -29,12 +29,12 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['exceljs', 'file-saver', '@han/core'],
+      external: ['exceljs', 'file-saver', '@hannndler/core'],
       output: {
         globals: {
           exceljs: 'ExcelJS',
           'file-saver': 'saveAs',
-          '@han/core': 'HanCore',
+          '@hannndler/core': 'HanCore',
         },
         exports: 'named',
       },

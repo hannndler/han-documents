@@ -26,6 +26,6 @@ export {
 export { EventEmitter } from './utils/EventEmitter';
 
 // Re-export shared types from core for convenience
-export type { IDocumentMetadata } from '@han/core';
-export { Result, success, error } from '@han/core';// Default export
+export type { IDocumentMetadata } from '@hannndler/core';
+export { Result, success, error } from '@hannndler/core';// Default export
 export { PDFBuilder as default } from './core/PDFBuilder';

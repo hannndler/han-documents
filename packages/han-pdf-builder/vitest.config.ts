@@ -11,7 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@han/core': path.resolve(__dirname, '../han-documents-core/src/index.ts'),
+      '@hannndler/core': path.resolve(__dirname, '../han-documents-core/src/index.ts'),
     },
   },
 });

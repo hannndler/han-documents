@@ -2,7 +2,7 @@
  * Builder-specific type definitions for PDF Builder
  */
 
-import { IDocumentMetadata, Result, Color } from '@han/core';
+import { IDocumentMetadata, Result, Color } from '@hannndler/core';
 import { IPDFPage, IPDFPageConfig } from './page.types';
 import { IPDFStyle, IPDFTheme } from './style.types';
 import { IPDFContentBlock } from './content.types';

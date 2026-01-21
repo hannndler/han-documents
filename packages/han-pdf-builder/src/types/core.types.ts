@@ -3,12 +3,12 @@
  * Adaptado para usar tipos compartidos de han-documents-core
  */
 
-import { Color, IDocumentMetadata, Result, ErrorType as CoreErrorType } from '@han/core';
+import { Color, IDocumentMetadata, Result, ErrorType as CoreErrorType } from '@hannndler/core';
 
 // Re-export tipos compartidos
-export type { Color, Result, IDocumentMetadata } from '@han/core';
-// Use CoreErrorType from @han/core instead of local enum
-export { ErrorType as CoreErrorType } from '@han/core';
+export type { Color, Result, IDocumentMetadata } from '@hannndler/core';
+// Use CoreErrorType from @hannndler/core instead of local enum
+export { ErrorType as CoreErrorType } from '@hannndler/core';
 
 // Local ErrorType enum (for compatibility, may add PDF-specific errors later)
 export enum LocalErrorType {
@@ -22,6 +22,6 @@ export enum LocalErrorType {
   TEMPLATE_ERROR = 'TEMPLATE_ERROR'
 }
 
-// Re-export as ErrorType for convenience (use CoreErrorType from @han/core)
+// Re-export as ErrorType for convenience (use CoreErrorType from @hannndler/core)
 export type { CoreErrorType as ErrorType };
 

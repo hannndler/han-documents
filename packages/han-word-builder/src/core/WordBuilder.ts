@@ -10,7 +10,7 @@ import {
   error, 
   ErrorType,
   IDocumentBuilder 
-} from '@han/core';
+} from '@hannndler/core';
 
 /**
  * WordBuilder class for creating Word documents

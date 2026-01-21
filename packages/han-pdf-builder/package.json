@@ -1,5 +1,5 @@
 {
-  "name": "@han/pdf-builder",
+  "name": "@hannndler/pdf-builder",
   "version": "0.1.0",
   "description": "Advanced PDF document generator with TypeScript support",
   "type": "module",
@@ -35,8 +35,11 @@
   ],
   "author": "Han Documents Team",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
-    "@han/core": "workspace:*",
+    "@hannndler/core": "workspace:^",
     "file-saver": "^2.0.5",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.530",

@@ -40,8 +40,8 @@ export {
 export { EventEmitter } from './utils/EventEmitter';
 
 // Re-export shared types from core for convenience
-export type { IDocumentMetadata, IExcelMetadata } from '@han/core';
-export { Result, success, error } from '@han/core';
+export type { IDocumentMetadata, IExcelMetadata } from '@hannndler/core';
+export { Result, success, error } from '@hannndler/core';
 
 // Default export
 export { ExcelBuilder as default } from './core/ExcelBuilder';
