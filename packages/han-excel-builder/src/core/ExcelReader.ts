@@ -2,10 +2,13 @@
  * ExcelReader - Class for reading Excel files and converting them to JSON
  */
 
-import ExcelJS from 'exceljs';
+import * as ExcelJS from 'exceljs';
 import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
 import {
   IExcelReaderOptions,
+  IExcelReaderDetailedOptions,
+  IExcelReaderFlatOptions,
+  IExcelReaderWorksheetOptions,
   IJsonWorkbook,
   IJsonSheet,
   IJsonRow,
@@ -21,127 +24,306 @@ import { ErrorType, IErrorResult } from '../types/compat.types';
 
 /**
  * ExcelReader class for reading Excel files and converting to JSON
+ * 
+ * @example
+ * ```typescript
+ * // Using instance methods
+ * const reader = new ExcelReader({
+ *   outputFormat: OutputFormat.FLAT,
+ *   useFirstRowAsHeaders: true
+ * });
+ * 
+ * const result = await reader.fromBuffer(arrayBuffer);
+ * 
+ * // Using static methods (convenience)
+ * const result2 = await ExcelReader.fromBuffer(arrayBuffer, { outputFormat: OutputFormat.DETAILED });
+ * ```
  */
 export class ExcelReader {
+  private defaultOptions: IExcelReaderOptions;
+
   /**
-   * Read Excel file from ArrayBuffer
+   * Creates a new ExcelReader instance with default options
+   * 
+   * @param defaultOptions - Default options to use for all read operations
    */
-  static async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
-    buffer: ArrayBuffer,
-    options: IExcelReaderOptions = {}
+  constructor(defaultOptions: IExcelReaderOptions = {}) {
+    this.defaultOptions = defaultOptions;
+  }
+
+  /**
+   * Helper to create error result with correct typing
+   */
+  private createErrorResult<T extends OutputFormat>(
+    errorType: CoreErrorType,
+    message: string,
+    code: string,
+    details?: Record<string, unknown>,
+    processingTime: number = 0
+  ): ExcelReaderResult<T> {
+    const errorResult = error(errorType, message, code, details);
+    return {
+      ...errorResult,
+      processingTime
+    } as ExcelReaderResult<T>;
+  }
+
+  /**
+   * Read Excel file from Node.js Buffer or ArrayBuffer
+   * 
+   * @param buffer - Node.js Buffer (preferred) or ArrayBuffer
+   * @param options - Reading options
+   * @returns Promise with the read result
+   * 
+   * @example
+   * ```typescript
+   * // With detailed format - TypeScript knows the result type
+   * const result = await reader.fromBuffer(buffer, { 
+   *   outputFormat: OutputFormat.DETAILED 
+   * });
+   * if (result.success) {
+   *   result.data.cells; // TypeScript knows this is IDetailedFormat
+   * }
+   * 
+   * // With Node.js Buffer (from multer, fs, etc.)
+   * const result = await reader.fromBuffer(req.file.buffer);
+   * ```
+   */
+  async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
+    options?: IExcelReaderOptions
+  ): Promise<ExcelReaderResult<T>>;
+
+  async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    options: any = {} // Accept any to work with overloads
   ): Promise<ExcelReaderResult<T>> {
+    // Merge options - TypeScript needs help inferring the combined type
+    const mergedOptions: IExcelReaderOptions = { ...this.defaultOptions, ...options } as IExcelReaderOptions;
     const startTime = Date.now();
 
     try {
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
+      // ExcelJS can accept Buffer directly, but we ensure it's in the right format
+      // Convert Buffer to ArrayBuffer if needed (for compatibility)
+      // If buffer has a .buffer property, it's a Node.js Buffer/Uint8Array
+      // Otherwise, assume it's already an ArrayBuffer
+      const arrayBuffer = buffer.buffer 
+        ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+        : buffer;
+      await workbook.xlsx.load(arrayBuffer);
 
-      const outputFormat = (options.outputFormat || OutputFormat.WORKSHEET) as OutputFormat;
+      const outputFormat = (mergedOptions.outputFormat || OutputFormat.WORKSHEET) as OutputFormat;
       const processingTime = Date.now() - startTime;
 
-      let result: unknown;
+      let result: IDetailedFormat | IFlatFormat | IFlatFormatMultiSheet | IJsonWorkbook;
 
       switch (outputFormat) {
         case OutputFormat.DETAILED:
-          result = this.convertToDetailedFormat(workbook, options);
+          result = this.convertToDetailedFormat(workbook, mergedOptions);
           break;
         case OutputFormat.FLAT:
-          result = this.convertToFlatFormat(workbook, options);
+          result = this.convertToFlatFormat(workbook, mergedOptions);
           break;
         case OutputFormat.WORKSHEET:
         default:
-          result = this.convertWorkbookToJson(workbook, options);
+          result = this.convertWorkbookToJson(workbook, mergedOptions);
           break;
       }
 
       // Apply mapper function if provided
-      if (options.mapper) {
+      if (mergedOptions.mapper) {
         try {
           // Apply mapper based on output format
           switch (outputFormat) {
             case OutputFormat.DETAILED:
-              result = (options.mapper as (data: IDetailedFormat) => unknown)(result as IDetailedFormat);
+              result = (mergedOptions.mapper as (data: IDetailedFormat) => unknown)(result as IDetailedFormat) as IDetailedFormat;
               break;
             case OutputFormat.FLAT:
-              result = (options.mapper as (data: IFlatFormat | IFlatFormatMultiSheet) => unknown)(result as IFlatFormat | IFlatFormatMultiSheet);
+              result = (mergedOptions.mapper as (data: IFlatFormat | IFlatFormatMultiSheet) => unknown)(result as IFlatFormat | IFlatFormatMultiSheet) as IFlatFormat | IFlatFormatMultiSheet;
               break;
             case OutputFormat.WORKSHEET:
             default:
-              result = (options.mapper as (data: IJsonWorkbook) => unknown)(result as IJsonWorkbook);
+              result = (mergedOptions.mapper as (data: IJsonWorkbook) => unknown)(result as IJsonWorkbook) as IJsonWorkbook;
               break;
           }
         } catch (mapperError) {
-          const errorResult = error(
+          return this.createErrorResult<T>(
             CoreErrorType.VALIDATION_ERROR,
             mapperError instanceof Error 
               ? `Mapper function error: ${mapperError.message}` 
               : 'Error in mapper function',
             'MAPPER_ERROR',
-            { originalError: mapperError }
+            { originalError: mapperError },
+            Date.now() - startTime
           );
-          return {
-            ...errorResult,
-            processingTime: Date.now() - startTime
-          } as ExcelReaderResult<T>;
         }
       }
 
-      const successResult = success(result as T);
-      return {
-        ...successResult,
-        processingTime
-      } as unknown as ExcelReaderResult<T>;
+      // Create success result with correct type based on outputFormat
+      // We need to preserve the discriminated union structure for TypeScript
+      switch (outputFormat) {
+        case OutputFormat.DETAILED: {
+          const successResult = success(result as IDetailedFormat);
+          return {
+            ...successResult,
+            processingTime
+          } as ExcelReaderResult<T>;
+        }
+        case OutputFormat.FLAT: {
+          const successResult = success(result as IFlatFormat | IFlatFormatMultiSheet);
+          return {
+            ...successResult,
+            processingTime
+          } as ExcelReaderResult<T>;
+        }
+        case OutputFormat.WORKSHEET:
+        default: {
+          const successResult = success(result as IJsonWorkbook);
+          return {
+            ...successResult,
+            processingTime
+          } as ExcelReaderResult<T>;
+        }
+      }
     } catch (err: any) {
-      const errorResult = error(
+      return this.createErrorResult<T>(
         CoreErrorType.FILE_ERROR,
         err.message || 'Failed to read Excel file',
         'READ_FAILED',
-        { originalError: err }
+        { originalError: err },
+        Date.now() - startTime
       );
-      return {
-        ...errorResult,
-        processingTime: Date.now() - startTime
-      } as ExcelReaderResult<T>;
     }
   }
 
   /**
    * Read Excel file from Blob
    */
-  static async fromBlob<T extends OutputFormat = OutputFormat.WORKSHEET>(
+  async fromBlob(
+    blob: Blob,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  async fromBlob(
+    blob: Blob,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  async fromBlob(
+    blob: Blob,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  async fromBlob<T extends OutputFormat = OutputFormat.WORKSHEET>(
     blob: Blob,
     options: IExcelReaderOptions = {}
   ): Promise<ExcelReaderResult<T>> {
     const arrayBuffer = await blob.arrayBuffer();
-    return this.fromBuffer<T>(arrayBuffer, options);
+    // fromBuffer can handle both Buffer and ArrayBuffer
+    // We pass ArrayBuffer directly, and fromBuffer will convert it if needed
+    // Use type assertion to help TypeScript with overload resolution
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.fromBuffer(arrayBuffer, options as any) as Promise<ExcelReaderResult<T>>;
   }
 
   /**
    * Read Excel file from File (browser)
    */
-  static async fromFile<T extends OutputFormat = OutputFormat.WORKSHEET>(
+  async fromFile(
+    file: File,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  async fromFile(
+    file: File,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  async fromFile(
+    file: File,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  async fromFile<T extends OutputFormat = OutputFormat.WORKSHEET>(
     file: File,
     options: IExcelReaderOptions = {}
   ): Promise<ExcelReaderResult<T>> {
-    return this.fromBlob<T>(file, options);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.fromBlob(file, options as any) as Promise<ExcelReaderResult<T>>;
+  }
+
+  /**
+   * Read Excel file from Node.js Buffer (Node.js only)
+   * Useful when receiving files from multer or other Node.js file upload libraries
+   * Note: This method only works in Node.js environment
+   * @deprecated Use fromBuffer() directly, as it now accepts Buffer
+   */
+  async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  async fromNodeBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any, // Node.js Buffer type (available in Node.js runtime)
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    // fromBuffer now accepts Buffer directly, so we just call it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
   }
 
   /**
    * Read Excel file from path (Node.js only)
    * Note: This method only works in Node.js environment
    */
-  static async fromPath<T extends OutputFormat = OutputFormat.WORKSHEET>(
+  async fromPath(
+    filePath: string,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  async fromPath(
+    filePath: string,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  async fromPath(
+    filePath: string,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  async fromPath<T extends OutputFormat = OutputFormat.WORKSHEET>(
     filePath: string,
     options: IExcelReaderOptions = {}
   ): Promise<ExcelReaderResult<T>> {
     try {
       // Dynamic import - only loads fs in Node.js environment
       // This allows the code to work in both browser and Node.js
-      // @ts-expect-error - fs/promises is a Node.js module, not available in browser
       const fs = await import('fs/promises');
       const buffer = await fs.readFile(filePath);
-      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-      return this.fromBuffer(arrayBuffer, options);
+      // fromBuffer now accepts Buffer directly
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return this.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
     } catch (err: any) {
       // Check if error is because fs is not available (browser environment)
       const isBrowserError = err instanceof Error && 
@@ -149,25 +331,156 @@ export class ExcelReader {
          err.message.includes('fs') ||
          (typeof window !== 'undefined'));
       
-      const errorResult = error(
+      return this.createErrorResult<T>(
         CoreErrorType.FILE_ERROR,
         isBrowserError 
           ? 'fromPath() method requires Node.js environment. Use fromFile() or fromBlob() in browser.'
           : (err.message || 'Error reading file from path'),
         'PATH_READ_FAILED',
-        { originalError: err }
+        { originalError: err },
+        0
       );
-      return {
-        ...errorResult,
-        processingTime: 0
-      } as ExcelReaderResult<T>;
     }
+  }
+
+  /**
+   * Static method: Read Excel file from Node.js Buffer or ArrayBuffer (convenience method)
+   */
+  static async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  static async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  static async fromBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  static async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options?: IExcelReaderOptions
+  ): Promise<ExcelReaderResult<T>>;
+  static async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+  }
+
+  /**
+   * Static method: Read Excel file from Blob (convenience method)
+   */
+  static async fromBlob(
+    blob: Blob,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  static async fromBlob(
+    blob: Blob,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  static async fromBlob(
+    blob: Blob,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  static async fromBlob<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    blob: Blob,
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBlob(blob, options as any) as Promise<ExcelReaderResult<T>>;
+  }
+
+  /**
+   * Static method: Read Excel file from File (convenience method)
+   */
+  static async fromFile(
+    file: File,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  static async fromFile(
+    file: File,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  static async fromFile(
+    file: File,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  static async fromFile<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    file: File,
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromFile(file, options as any) as Promise<ExcelReaderResult<T>>;
+  }
+
+  /**
+   * Static method: Read Excel file from Node.js Buffer (convenience method)
+   * @deprecated Use fromBuffer() directly, as it now accepts Buffer
+   */
+  static async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  static async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  static async fromNodeBuffer(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  static async fromNodeBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any, // Node.js Buffer type (available in Node.js runtime)
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+  }
+
+  /**
+   * Static method: Read Excel file from path (convenience method)
+   */
+  static async fromPath(
+    filePath: string,
+    options: IExcelReaderDetailedOptions
+  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+  static async fromPath(
+    filePath: string,
+    options: IExcelReaderFlatOptions
+  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+  static async fromPath(
+    filePath: string,
+    options?: IExcelReaderWorksheetOptions
+  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+  static async fromPath<T extends OutputFormat = OutputFormat.WORKSHEET>(
+    filePath: string,
+    options: IExcelReaderOptions = {}
+  ): Promise<ExcelReaderResult<T>> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromPath(filePath, options as any) as Promise<ExcelReaderResult<T>>;
   }
 
   /**
    * Convert ExcelJS Workbook to JSON
    */
-  private static convertWorkbookToJson(
+  private convertWorkbookToJson(
     workbook: ExcelJS.Workbook,
     options: IExcelReaderOptions
   ): IJsonWorkbook {
@@ -263,7 +576,7 @@ export class ExcelReader {
   /**
    * Convert ExcelJS Worksheet to JSON
    */
-  private static convertSheetToJson(
+  private convertSheetToJson(
     worksheet: ExcelJS.Worksheet,
     options: {
       includeEmptyRows: boolean;
@@ -389,7 +702,7 @@ export class ExcelReader {
   /**
    * Convert ExcelJS Cell to JSON
    */
-  private static convertCellToJson(
+  private convertCellToJson(
     cell: ExcelJS.Cell,
     options: {
       includeFormatting: boolean;
@@ -420,7 +733,8 @@ export class ExcelReader {
       value = cell.value as boolean;
       type = 'boolean';
     } else if (cell.type === ExcelJS.ValueType.Formula) {
-      if (includeFormulas && cell.formula) {
+      // Always try to get formula if includeFormulas is true
+      if (includeFormulas) {
         value = cell.result || cell.value;
         type = 'formula';
       } else {
@@ -447,15 +761,21 @@ export class ExcelReader {
       reference: cell.address
     };
 
-    // Add formatted value if requested
-    if (includeFormatting && cell.numFmt) {
-      // Try to get formatted value (ExcelJS doesn't always provide this easily)
-      jsonCell.formattedValue = String(value);
+    // Add formatted value if requested - use cell.text which is the actual displayed text
+    if (includeFormatting) {
+      // cell.text is the formatted text as it appears in Excel
+      jsonCell.formattedValue = cell.text || String(value);
     }
 
     // Add formula if requested
-    if (includeFormulas && cell.formula) {
-      jsonCell.formula = cell.formula;
+    if (includeFormulas) {
+      // Try to get formula from cell
+      if (cell.formula) {
+        jsonCell.formula = cell.formula;
+      } else if (cell.type === ExcelJS.ValueType.Formula) {
+        // For formula cells, try to get formula from the cell
+        jsonCell.formula = (cell as any).formula || undefined;
+      }
     }
 
     // Add comment if exists
@@ -481,7 +801,7 @@ export class ExcelReader {
   /**
    * Convert workbook to detailed format (with position information)
    */
-  private static convertToDetailedFormat(
+  private convertToDetailedFormat(
     workbook: ExcelJS.Workbook,
     options: IExcelReaderOptions
   ): IDetailedFormat {
@@ -546,9 +866,12 @@ export class ExcelReader {
           const columnLetter = this.numberToColumnLetter(colNum);
           const cellValue = this.getCellValue(cell, { includeFormatting, includeFormulas, datesAsISO });
 
+          // Get the formatted text from ExcelJS (this is the actual displayed text)
+          const cellText = cell.text || String(cellValue.value ?? '');
+
           const detailedCell: IDetailedCell = {
             value: cellValue.value,
-            text: String(cellValue.value ?? ''),
+            text: cellText,
             column: colNum,
             columnLetter,
             row: rowNum,
@@ -556,13 +879,19 @@ export class ExcelReader {
             sheet: worksheet.name
           };
 
-          if (cellValue.type) {
+          // Always include type if available
+          if (cellValue.type !== undefined) {
             detailedCell.type = cellValue.type;
           }
-          if (cellValue.formattedValue) {
+          // Include formattedValue if includeFormatting is true or if it exists
+          if (includeFormatting && cellValue.formattedValue !== undefined) {
             detailedCell.formattedValue = cellValue.formattedValue;
+          } else if (includeFormatting && cellText !== String(cellValue.value ?? '')) {
+            // If formatting is requested and text differs from value, use text as formattedValue
+            detailedCell.formattedValue = cellText;
           }
-          if (cellValue.formula) {
+          // Include formula if includeFormulas is true and formula exists
+          if (includeFormulas && cellValue.formula !== undefined) {
             detailedCell.formula = cellValue.formula;
           }
 
@@ -603,7 +932,7 @@ export class ExcelReader {
   /**
    * Convert workbook to flat format (just data)
    */
-  private static convertToFlatFormat(
+  private convertToFlatFormat(
     workbook: ExcelJS.Workbook,
     options: IExcelReaderOptions
   ): IFlatFormat | IFlatFormatMultiSheet {
@@ -719,7 +1048,7 @@ export class ExcelReader {
   /**
    * Convert a single sheet to flat format
    */
-  private static convertSheetToFlat(
+  private convertSheetToFlat(
     worksheet: ExcelJS.Worksheet,
     options: {
       useFirstRowAsHeaders: boolean;
@@ -807,7 +1136,7 @@ export class ExcelReader {
   /**
    * Get cell value with type information
    */
-  private static getCellValue(
+  private getCellValue(
     cell: ExcelJS.Cell,
     options: {
       includeFormatting: boolean;
@@ -844,14 +1173,18 @@ export class ExcelReader {
       value = cell.value as boolean;
       type = 'boolean';
     } else if (cell.type === ExcelJS.ValueType.Formula) {
-      if (includeFormulas && cell.formula) {
-        formula = cell.formula;
+      // Always try to get formula if includeFormulas is true
+      if (includeFormulas) {
+        formula = cell.formula || undefined;
         value = cell.result || cell.value;
         type = 'formula';
       } else {
         value = cell.result || cell.value;
         type = typeof cell.result === 'number' ? 'number' : typeof cell.result === 'string' ? 'string' : 'unknown';
       }
+    } else if (includeFormulas && cell.formula) {
+      // Some cells might have formulas even if type is not Formula
+      formula = cell.formula;
     } else if (cell.type === ExcelJS.ValueType.Hyperlink) {
       const hyperlinkValue = cell.value as { text?: string; hyperlink?: string } | string;
       if (typeof hyperlinkValue === 'object' && hyperlinkValue !== null) {
@@ -865,22 +1198,24 @@ export class ExcelReader {
       type = 'unknown';
     }
 
-    if (includeFormatting && cell.numFmt) {
-      formattedValue = String(value);
+    // Get formatted value - use cell.text which is the actual displayed text in Excel
+    if (includeFormatting) {
+      // cell.text is the formatted text as it appears in Excel
+      formattedValue = cell.text || String(value);
     }
 
     return {
       value,
       type,
-      ...(formattedValue && { formattedValue }),
-      ...(formula && { formula })
+      ...(formattedValue !== undefined && { formattedValue }),
+      ...(formula !== undefined && { formula })
     };
   }
 
   /**
    * Convert column number to letter (1 = A, 2 = B, 27 = AA, etc.)
    */
-  private static numberToColumnLetter(columnNumber: number): string {
+  private numberToColumnLetter(columnNumber: number): string {
     let result = '';
     while (columnNumber > 0) {
       columnNumber--;

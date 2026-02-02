@@ -25,7 +25,13 @@ export default defineConfig({
     lib: {
       entry: 'src/index.ts',
       name: 'HanExcel',
-      fileName: (format) => `han-excel.${format}.js`,
+      fileName: (format) => {
+        // Use .cjs extension for CommonJS format when package.json has "type": "module"
+        if (format === 'cjs') {
+          return 'han-excel.cjs';
+        }
+        return `han-excel.${format}.js`;
+      },
       formats: ['es', 'cjs'],
     },
     rollupOptions: {

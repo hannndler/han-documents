@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "description": "Advanced PDF document generator with TypeScript support",
   "type": "module",
-  "main": "./dist/han-pdf.cjs.js",
+  "main": "./dist/han-pdf.cjs",
   "module": "./dist/han-pdf.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/han-pdf.es.js",
-      "require": "./dist/han-pdf.cjs.js",
+      "require": "./dist/han-pdf.cjs",
       "types": "./dist/index.d.ts"
     }
   },

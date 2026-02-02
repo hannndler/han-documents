@@ -2,7 +2,7 @@
  * Types for Excel Reader functionality
  */
 
-import { Result } from './core.types';
+import { Result, ISuccessResult, IErrorResult } from './core.types';
 
 /**
  * Output format types
@@ -24,13 +24,9 @@ export type DetailedMapper = (data: IDetailedFormat) => unknown;
 export type FlatMapper = (data: IFlatFormat | IFlatFormatMultiSheet) => unknown;
 
 /**
- * Options for reading Excel files
+ * Base options for reading Excel files
  */
-export interface IExcelReaderOptions {
-  /** Output format (default: 'worksheet') */
-  outputFormat?: OutputFormat | 'worksheet' | 'detailed' | 'flat';
-  /** Mapper function to transform the response data */
-  mapper?: WorksheetMapper | DetailedMapper | FlatMapper;
+interface IBaseExcelReaderOptions {
   /** Whether to include empty rows */
   includeEmptyRows?: boolean;
   /** Whether to use first row as headers */
@@ -56,6 +52,54 @@ export interface IExcelReaderOptions {
   /** Whether to convert dates to ISO strings */
   datesAsISO?: boolean;
 }
+
+/**
+ * Options for reading Excel files with worksheet format
+ */
+export interface IExcelReaderWorksheetOptions extends IBaseExcelReaderOptions {
+  /** Output format - worksheet */
+  outputFormat?: OutputFormat.WORKSHEET | 'worksheet';
+  /** Mapper function to transform the response data */
+  mapper?: WorksheetMapper;
+}
+
+/**
+ * Options for reading Excel files with detailed format
+ */
+export interface IExcelReaderDetailedOptions extends IBaseExcelReaderOptions {
+  /** Output format - detailed */
+  outputFormat: OutputFormat.DETAILED | 'detailed';
+  /** Mapper function to transform the response data */
+  mapper?: DetailedMapper;
+}
+
+/**
+ * Options for reading Excel files with flat format
+ */
+export interface IExcelReaderFlatOptions extends IBaseExcelReaderOptions {
+  /** Output format - flat */
+  outputFormat: OutputFormat.FLAT | 'flat';
+  /** Mapper function to transform the response data */
+  mapper?: FlatMapper;
+}
+
+/**
+ * Type helper to extract output format from options
+ */
+export type ExtractOutputFormat<T> = 
+  T extends IExcelReaderDetailedOptions
+    ? OutputFormat.DETAILED
+    : T extends IExcelReaderFlatOptions
+    ? OutputFormat.FLAT
+    : OutputFormat.WORKSHEET;
+
+/**
+ * Options for reading Excel files
+ */
+export type IExcelReaderOptions = 
+  | IExcelReaderWorksheetOptions 
+  | IExcelReaderDetailedOptions 
+  | IExcelReaderFlatOptions;
 
 /**
  * Cell data in JSON format
@@ -205,14 +249,45 @@ export interface IFlatFormatMultiSheet {
 }
 
 /**
+ * Success result with processing time for detailed format
+ */
+export interface IDetailedSuccessResult extends ISuccessResult<IDetailedFormat> {
+  processingTime?: number;
+}
+
+/**
+ * Success result with processing time for flat format
+ */
+export interface IFlatSuccessResult extends ISuccessResult<IFlatFormat | IFlatFormatMultiSheet> {
+  processingTime?: number;
+}
+
+/**
+ * Success result with processing time for worksheet format
+ */
+export interface IWorksheetSuccessResult extends ISuccessResult<IJsonWorkbook> {
+  processingTime?: number;
+}
+
+/**
+ * Error result with processing time
+ */
+export interface IErrorResultWithTime extends IErrorResult {
+  processingTime?: number;
+}
+
+/**
  * Reader result - generic type based on output format
+ * This type ensures TypeScript correctly infers the data type based on the output format
+ * 
+ * Using explicit interfaces instead of intersections to preserve discriminated union structure
  */
 export type ExcelReaderResult<T extends OutputFormat = OutputFormat.WORKSHEET> = 
   T extends OutputFormat.DETAILED
-    ? Result<IDetailedFormat> & { processingTime?: number }
+    ? IDetailedSuccessResult | IErrorResultWithTime
     : T extends OutputFormat.FLAT
-    ? Result<IFlatFormat | IFlatFormatMultiSheet> & { processingTime?: number }
-    : Result<IJsonWorkbook> & { processingTime?: number };
+    ? IFlatSuccessResult | IErrorResultWithTime
+    : IWorksheetSuccessResult | IErrorResultWithTime;
 
 /**
  * Legacy reader result (for backward compatibility)

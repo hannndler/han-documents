@@ -46,4 +46,3 @@ export { Result, success, error } from '@hannndler/core';
 // Default export
 export { ExcelBuilder as default } from './core/ExcelBuilder';
 
-

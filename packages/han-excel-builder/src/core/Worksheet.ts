@@ -3,7 +3,7 @@
  * Adaptado para usar tipos compartidos de han-documents-core
  */
 
-import ExcelJS from 'exceljs';
+import * as ExcelJS from 'exceljs';
 import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
 import {
   IWorksheet,

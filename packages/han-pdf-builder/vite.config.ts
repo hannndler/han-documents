@@ -16,7 +16,13 @@ export default defineConfig({
     lib: {
       entry: 'src/index.ts',
       name: 'HanPDF',
-      fileName: (format) => `han-pdf.${format}.js`,
+      fileName: (format) => {
+        // Use .cjs extension for CommonJS format when package.json has "type": "module"
+        if (format === 'cjs') {
+          return 'han-pdf.cjs';
+        }
+        return `han-pdf.${format}.js`;
+      },
       formats: ['es', 'cjs'],
     },
     rollupOptions: {

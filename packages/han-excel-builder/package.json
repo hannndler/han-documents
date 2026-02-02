@@ -1,15 +1,15 @@
 {
   "name": "@hannndler/xlsx-builder",
-  "version": "2.0.3",
+  "version": "2.0.9",
   "description": "Advanced Excel file generator with TypeScript support, comprehensive styling, and optimized performance",
   "type": "module",
-  "main": "./dist/han-excel.cjs.js",
+  "main": "./dist/han-excel.cjs",
   "module": "./dist/han-excel.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/han-excel.es.js",
-      "require": "./dist/han-excel.cjs.js",
+      "require": "./dist/han-excel.cjs",
       "types": "./dist/index.d.ts"
     },
     "./styles": {

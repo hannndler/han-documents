@@ -1,4 +1,4 @@
-# @han/xlsx-builder
+# @hannndler/xlsx-builder
 
 Advanced Excel file generator with TypeScript support, comprehensive styling, and optimized performance.
 
@@ -22,11 +22,11 @@ Advanced Excel file generator with TypeScript support, comprehensive styling, an
 ## Installation
 
 ```bash
-npm install @han/xlsx-builder
+npm install @hannndler/xlsx-builder
 # or
-pnpm add @han/xlsx-builder
+pnpm add @hannndler/xlsx-builder
 # or
-yarn add @han/xlsx-builder
+yarn add @hannndler/xlsx-builder
 ```
 
 ## Quick Start
@@ -34,7 +34,7 @@ yarn add @han/xlsx-builder
 ### Basic Usage
 
 ```typescript
-import { ExcelBuilder, CellType } from '@han/xlsx-builder';
+import { ExcelBuilder, CellType } from '@hannndler/xlsx-builder';
 
 // Create a new Excel builder
 const builder = new ExcelBuilder({
@@ -407,10 +407,53 @@ worksheet.addExcelTable({
 
 Extract data from existing Excel files.
 
+### Using Instance Methods (Recommended)
+
 ```typescript
-import { ExcelReader, OutputFormat } from '@han/xlsx-builder';
+import { ExcelReader, OutputFormat } from '@hannndler/xlsx-builder';
+
+// Create a reader instance with default options
+const reader = new ExcelReader({
+  outputFormat: OutputFormat.FLAT,
+  useFirstRowAsHeaders: true,
+  includeEmptyRows: false
+});
 
 // Read from buffer
+const buffer = await fetch('report.xlsx').then(r => r.arrayBuffer());
+const result = await reader.fromBuffer(buffer);
+
+// Read from file (Node.js only)
+const fileResult = await reader.fromPath('./report.xlsx', {
+  sheetName: 'Sales' // Override specific option
+});
+
+// Read from Node.js Buffer (useful with multer or file uploads)
+import multer from 'multer';
+const upload = multer();
+// In your route handler:
+const result = await reader.fromNodeBuffer(req.file.buffer, {
+  outputFormat: OutputFormat.FLAT
+});
+
+// Read from File (browser)
+const fileInput = document.querySelector('input[type="file"]');
+if (fileInput?.files?.[0]) {
+  const fileResult = await reader.fromFile(fileInput.files[0]);
+}
+
+if (result.success) {
+  console.log('Data:', result.data);
+  console.log('Processing time:', result.processingTime, 'ms');
+}
+```
+
+### Using Static Methods (Convenience)
+
+```typescript
+import { ExcelReader, OutputFormat } from '@hannndler/xlsx-builder';
+
+// Read from buffer (static method)
 const buffer = await fetch('report.xlsx').then(r => r.arrayBuffer());
 const result = await ExcelReader.fromBuffer(buffer, {
   outputFormat: OutputFormat.WORKSHEET,
@@ -419,8 +462,8 @@ const result = await ExcelReader.fromBuffer(buffer, {
 });
 
 if (result.success) {
-  console.log('Worksheets:', result.data.worksheets.length);
-  result.data.worksheets.forEach(sheet => {
+  console.log('Worksheets:', result.data.sheets.length);
+  result.data.sheets.forEach(sheet => {
     console.log('Sheet:', sheet.name);
     sheet.rows.forEach(row => {
       console.log('Row:', row.cells);
@@ -429,14 +472,21 @@ if (result.success) {
 }
 
 // Read from file (Node.js only)
-const fileResult = await ExcelReader.fromFile('./report.xlsx', {
-  outputFormat: OutputFormat.FLAT, // Get plain text
-  sheetName: 'Sales' // Read specific sheet
+const fileResult = await ExcelReader.fromPath('./report.xlsx', {
+  outputFormat: OutputFormat.FLAT,
+  sheetName: 'Sales'
 });
 
-if (fileResult.success) {
-  console.log('Sheet text:', fileResult.data.text);
-}
+// Read from Blob (browser)
+const blob = await fetch('report.xlsx').then(r => r.blob());
+const blobResult = await ExcelReader.fromBlob(blob, {
+  outputFormat: OutputFormat.DETAILED
+});
+
+// Read from Node.js Buffer (useful with multer)
+const bufferResult = await ExcelReader.fromNodeBuffer(req.file.buffer, {
+  outputFormat: OutputFormat.WORKSHEET
+});
 ```
 
 ## Environment Support
@@ -546,10 +596,31 @@ console.log('Total cells:', stats.totalCells);
 
 ### ExcelReader
 
-#### Static Methods
+Class for reading Excel files and converting them to JSON.
 
-- `fromBuffer(buffer: ArrayBuffer, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from buffer
-- `fromFile(filePath: string, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from file (Node.js)
+#### Constructor
+
+```typescript
+new ExcelReader(defaultOptions?: IExcelReaderOptions)
+```
+
+Creates a new ExcelReader instance with default options that will be used for all read operations.
+
+#### Instance Methods
+
+- `fromBuffer(buffer: ArrayBuffer, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from ArrayBuffer
+- `fromBlob(blob: Blob, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from Blob
+- `fromFile(file: File, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from File (browser)
+- `fromNodeBuffer(buffer: Buffer, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from Node.js Buffer (Node.js only, useful with multer)
+- `fromPath(filePath: string, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from file path (Node.js)
+
+#### Static Methods (Convenience)
+
+- `ExcelReader.fromBuffer(buffer: ArrayBuffer, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from buffer
+- `ExcelReader.fromBlob(blob: Blob, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from Blob
+- `ExcelReader.fromFile(file: File, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from File (browser)
+- `ExcelReader.fromNodeBuffer(buffer: Buffer, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from Node.js Buffer (Node.js only, useful with multer)
+- `ExcelReader.fromPath(filePath: string, options?: IExcelReaderOptions): Promise<ExcelReaderResult>` - Read from file path (Node.js)
 
 ## TypeScript Support
 
@@ -569,7 +640,7 @@ import type {
   NumberFormat,
   HorizontalAlignment,
   VerticalAlignment
-} from '@han/xlsx-builder';
+} from '@hannndler/xlsx-builder';
 ```
 
 ## Examples

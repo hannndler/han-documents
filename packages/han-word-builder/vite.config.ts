@@ -16,7 +16,13 @@ export default defineConfig({
     lib: {
       entry: 'src/index.ts',
       name: 'HanWord',
-      fileName: (format) => `han-word.${format}.js`,
+      fileName: (format) => {
+        // Use .cjs extension for CommonJS format when package.json has "type": "module"
+        if (format === 'cjs') {
+          return 'han-word.cjs';
+        }
+        return `han-word.${format}.js`;
+      },
       formats: ['es', 'cjs'],
     },
     rollupOptions: {

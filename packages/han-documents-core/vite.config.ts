@@ -25,7 +25,13 @@ export default defineConfig({
     lib: {
       entry: 'src/index.ts',
       name: 'HanDocumentsCore',
-      fileName: (format) => `han-core.${format}.js`,
+      fileName: (format) => {
+        // Use .cjs extension for CommonJS format when package.json has "type": "module"
+        if (format === 'cjs') {
+          return 'han-core.cjs';
+        }
+        return `han-core.${format}.js`;
+      },
       formats: ['es', 'cjs'],
     },
     rollupOptions: {

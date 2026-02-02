@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "description": "Advanced Word document generator with TypeScript support",
   "type": "module",
-  "main": "./dist/han-word.cjs.js",
+  "main": "./dist/han-word.cjs",
   "module": "./dist/han-word.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/han-word.es.js",
-      "require": "./dist/han-word.cjs.js",
+      "require": "./dist/han-word.cjs",
       "types": "./dist/index.d.ts"
     }
   },
