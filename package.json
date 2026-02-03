@@ -1,6 +1,6 @@
 {
   "name": "han-documents",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Monorepo for Han Documents - Excel, Word, PDF generators",
   "scripts": {
