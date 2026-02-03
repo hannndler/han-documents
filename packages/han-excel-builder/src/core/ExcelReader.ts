@@ -2,8 +2,13 @@
  * ExcelReader - Class for reading Excel files and converting them to JSON
  */
 
-import * as ExcelJS from 'exceljs';
-import { Result, success, error, ErrorType as CoreErrorType } from '@hannndler/core';
+import * as ExcelJS from "exceljs";
+import {
+  Result,
+  success,
+  error,
+  ErrorType as CoreErrorType,
+} from "@hannndler/core";
 import {
   IExcelReaderOptions,
   IExcelReaderDetailedOptions,
@@ -15,16 +20,21 @@ import {
   IJsonCell,
   OutputFormat,
   IDetailedFormat,
+  IUnifiedFormat,
   IDetailedCell,
   IFlatFormat,
   IFlatFormatMultiSheet,
-  ExcelReaderResult
-} from '../types/reader.types';
-import { ErrorType, IErrorResult } from '../types/compat.types';
+  ExcelReaderResult,
+  ExcelReaderUnifiedResult,
+  ExcelReaderDetailedResult,
+  ExcelReaderFlatResult,
+  ExcelReaderWorksheetResult,
+} from "../types/reader.types";
+import { ErrorType, IErrorResult } from "../types/compat.types";
 
 /**
  * ExcelReader class for reading Excel files and converting to JSON
- * 
+ *
  * @example
  * ```typescript
  * // Using instance methods
@@ -32,9 +42,9 @@ import { ErrorType, IErrorResult } from '../types/compat.types';
  *   outputFormat: OutputFormat.FLAT,
  *   useFirstRowAsHeaders: true
  * });
- * 
+ *
  * const result = await reader.fromBuffer(arrayBuffer);
- * 
+ *
  * // Using static methods (convenience)
  * const result2 = await ExcelReader.fromBuffer(arrayBuffer, { outputFormat: OutputFormat.DETAILED });
  * ```
@@ -44,7 +54,7 @@ export class ExcelReader {
 
   /**
    * Creates a new ExcelReader instance with default options
-   * 
+   *
    * @param defaultOptions - Default options to use for all read operations
    */
   constructor(defaultOptions: IExcelReaderOptions = {}) {
@@ -59,32 +69,32 @@ export class ExcelReader {
     message: string,
     code: string,
     details?: Record<string, unknown>,
-    processingTime: number = 0
+    processingTime: number = 0,
   ): ExcelReaderResult<T> {
     const errorResult = error(errorType, message, code, details);
     return {
       ...errorResult,
-      processingTime
+      processingTime,
     } as ExcelReaderResult<T>;
   }
 
   /**
    * Read Excel file from Node.js Buffer or ArrayBuffer
-   * 
+   *
    * @param buffer - Node.js Buffer (preferred) or ArrayBuffer
    * @param options - Reading options
    * @returns Promise with the read result
-   * 
+   *
    * @example
    * ```typescript
    * // With detailed format - TypeScript knows the result type
-   * const result = await reader.fromBuffer(buffer, { 
-   *   outputFormat: OutputFormat.DETAILED 
+   * const result = await reader.fromBuffer(buffer, {
+   *   outputFormat: OutputFormat.DETAILED
    * });
    * if (result.success) {
    *   result.data.cells; // TypeScript knows this is IDetailedFormat
    * }
-   * 
+   *
    * // With Node.js Buffer (from multer, fs, etc.)
    * const result = await reader.fromBuffer(req.file.buffer);
    * ```
@@ -92,32 +102,35 @@ export class ExcelReader {
   async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderDetailedOptions
-  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+    options: IExcelReaderDetailedOptions,
+  ): Promise<ExcelReaderDetailedResult>;
   async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderFlatOptions
-  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+    options: IExcelReaderFlatOptions,
+  ): Promise<ExcelReaderFlatResult>;
   async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options?: IExcelReaderWorksheetOptions
-  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+    options?: IExcelReaderWorksheetOptions,
+  ): Promise<ExcelReaderWorksheetResult>;
   async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
-    options?: IExcelReaderOptions
+    options?: IExcelReaderOptions,
   ): Promise<ExcelReaderResult<T>>;
 
   async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    options: any = {} // Accept any to work with overloads
+    options: any = {}, // Accept any to work with overloads
   ): Promise<ExcelReaderResult<T>> {
     // Merge options - TypeScript needs help inferring the combined type
-    const mergedOptions: IExcelReaderOptions = { ...this.defaultOptions, ...options } as IExcelReaderOptions;
+    const mergedOptions: IExcelReaderOptions = {
+      ...this.defaultOptions,
+      ...options,
+    } as IExcelReaderOptions;
     const startTime = Date.now();
 
     try {
@@ -126,15 +139,23 @@ export class ExcelReader {
       // Convert Buffer to ArrayBuffer if needed (for compatibility)
       // If buffer has a .buffer property, it's a Node.js Buffer/Uint8Array
       // Otherwise, assume it's already an ArrayBuffer
-      const arrayBuffer = buffer.buffer 
-        ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+      const arrayBuffer = buffer.buffer
+        ? buffer.buffer.slice(
+            buffer.byteOffset,
+            buffer.byteOffset + buffer.byteLength,
+          )
         : buffer;
       await workbook.xlsx.load(arrayBuffer);
 
-      const outputFormat = (mergedOptions.outputFormat || OutputFormat.WORKSHEET) as OutputFormat;
+      const outputFormat = (mergedOptions.outputFormat ||
+        OutputFormat.WORKSHEET) as OutputFormat;
       const processingTime = Date.now() - startTime;
 
-      let result: IDetailedFormat | IFlatFormat | IFlatFormatMultiSheet | IJsonWorkbook;
+      let result:
+        | IDetailedFormat
+        | IFlatFormat
+        | IFlatFormatMultiSheet
+        | IJsonWorkbook;
 
       switch (outputFormat) {
         case OutputFormat.DETAILED:
@@ -155,25 +176,35 @@ export class ExcelReader {
           // Apply mapper based on output format
           switch (outputFormat) {
             case OutputFormat.DETAILED:
-              result = (mergedOptions.mapper as (data: IDetailedFormat) => unknown)(result as IDetailedFormat) as IDetailedFormat;
+              result = (
+                mergedOptions.mapper as (data: IDetailedFormat) => unknown
+              )(result as IDetailedFormat) as IDetailedFormat;
               break;
             case OutputFormat.FLAT:
-              result = (mergedOptions.mapper as (data: IFlatFormat | IFlatFormatMultiSheet) => unknown)(result as IFlatFormat | IFlatFormatMultiSheet) as IFlatFormat | IFlatFormatMultiSheet;
+              result = (
+                mergedOptions.mapper as (
+                  data: IFlatFormat | IFlatFormatMultiSheet,
+                ) => unknown
+              )(result as IFlatFormat | IFlatFormatMultiSheet) as
+                | IFlatFormat
+                | IFlatFormatMultiSheet;
               break;
             case OutputFormat.WORKSHEET:
             default:
-              result = (mergedOptions.mapper as (data: IJsonWorkbook) => unknown)(result as IJsonWorkbook) as IJsonWorkbook;
+              result = (
+                mergedOptions.mapper as (data: IJsonWorkbook) => unknown
+              )(result as IJsonWorkbook) as IJsonWorkbook;
               break;
           }
         } catch (mapperError) {
           return this.createErrorResult<T>(
             CoreErrorType.VALIDATION_ERROR,
-            mapperError instanceof Error 
-              ? `Mapper function error: ${mapperError.message}` 
-              : 'Error in mapper function',
-            'MAPPER_ERROR',
+            mapperError instanceof Error
+              ? `Mapper function error: ${mapperError.message}`
+              : "Error in mapper function",
+            "MAPPER_ERROR",
             { originalError: mapperError },
-            Date.now() - startTime
+            Date.now() - startTime,
           );
         }
       }
@@ -182,35 +213,43 @@ export class ExcelReader {
       // We need to preserve the discriminated union structure for TypeScript
       switch (outputFormat) {
         case OutputFormat.DETAILED: {
-          const successResult = success(result as IDetailedFormat);
+          // Wrap in unified payload so declarations expose all formats
+          const unified: IUnifiedFormat = {
+            detailed: result as IDetailedFormat,
+          };
+          const successResult = success(unified);
           return {
             ...successResult,
-            processingTime
+            processingTime,
           } as ExcelReaderResult<T>;
         }
         case OutputFormat.FLAT: {
-          const successResult = success(result as IFlatFormat | IFlatFormatMultiSheet);
+          const unified: IUnifiedFormat = {
+            flat: result as IFlatFormat | IFlatFormatMultiSheet,
+          };
+          const successResult = success(unified);
           return {
             ...successResult,
-            processingTime
+            processingTime,
           } as ExcelReaderResult<T>;
         }
         case OutputFormat.WORKSHEET:
         default: {
-          const successResult = success(result as IJsonWorkbook);
+          const unified: IUnifiedFormat = { workbook: result as IJsonWorkbook };
+          const successResult = success(unified);
           return {
             ...successResult,
-            processingTime
+            processingTime,
           } as ExcelReaderResult<T>;
         }
       }
     } catch (err: any) {
       return this.createErrorResult<T>(
         CoreErrorType.FILE_ERROR,
-        err.message || 'Failed to read Excel file',
-        'READ_FAILED',
+        err.message || "Failed to read Excel file",
+        "READ_FAILED",
         { originalError: err },
-        Date.now() - startTime
+        Date.now() - startTime,
       );
     }
   }
@@ -220,26 +259,28 @@ export class ExcelReader {
    */
   async fromBlob(
     blob: Blob,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   async fromBlob(
     blob: Blob,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   async fromBlob(
     blob: Blob,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   async fromBlob<T extends OutputFormat = OutputFormat.WORKSHEET>(
     blob: Blob,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const arrayBuffer = await blob.arrayBuffer();
     // fromBuffer can handle both Buffer and ArrayBuffer
     // We pass ArrayBuffer directly, and fromBuffer will convert it if needed
     // Use type assertion to help TypeScript with overload resolution
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.fromBuffer(arrayBuffer, options as any) as Promise<ExcelReaderResult<T>>;
+    return this.fromBuffer(arrayBuffer, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
   }
 
   /**
@@ -247,19 +288,19 @@ export class ExcelReader {
    */
   async fromFile(
     file: File,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   async fromFile(
     file: File,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   async fromFile(
     file: File,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   async fromFile<T extends OutputFormat = OutputFormat.WORKSHEET>(
     file: File,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.fromBlob(file, options as any) as Promise<ExcelReaderResult<T>>;
@@ -274,26 +315,44 @@ export class ExcelReader {
   async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   async fromNodeBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any, // Node.js Buffer type (available in Node.js runtime)
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     // fromBuffer now accepts Buffer directly, so we just call it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+    return this.fromBuffer(buffer, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
+  }
+
+  /**
+   * Convenience static method that always returns the unified payload
+   * for Blob input.
+   */
+  static async fromBlobUnified(
+    blob: Blob,
+    options: IExcelReaderOptions = {},
+  ): Promise<ExcelReaderUnifiedResult> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBlob(
+      blob,
+      options as any,
+    ) as Promise<ExcelReaderUnifiedResult>;
   }
 
   /**
@@ -302,43 +361,46 @@ export class ExcelReader {
    */
   async fromPath(
     filePath: string,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   async fromPath(
     filePath: string,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   async fromPath(
     filePath: string,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   async fromPath<T extends OutputFormat = OutputFormat.WORKSHEET>(
     filePath: string,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     try {
       // Dynamic import - only loads fs in Node.js environment
       // This allows the code to work in both browser and Node.js
-      const fs = await import('fs/promises');
+      const fs = await import("fs/promises");
       const buffer = await fs.readFile(filePath);
       // fromBuffer now accepts Buffer directly
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return this.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+      return this.fromBuffer(buffer, options as any) as Promise<
+        ExcelReaderResult<T>
+      >;
     } catch (err: any) {
       // Check if error is because fs is not available (browser environment)
-      const isBrowserError = err instanceof Error && 
-        (err.message.includes('Cannot find module') || 
-         err.message.includes('fs') ||
-         (typeof window !== 'undefined'));
-      
+      const isBrowserError =
+        err instanceof Error &&
+        (err.message.includes("Cannot find module") ||
+          err.message.includes("fs") ||
+          typeof window !== "undefined");
+
       return this.createErrorResult<T>(
         CoreErrorType.FILE_ERROR,
-        isBrowserError 
-          ? 'fromPath() method requires Node.js environment. Use fromFile() or fromBlob() in browser.'
-          : (err.message || 'Error reading file from path'),
-        'PATH_READ_FAILED',
+        isBrowserError
+          ? "fromPath() method requires Node.js environment. Use fromFile() or fromBlob() in browser."
+          : err.message || "Error reading file from path",
+        "PATH_READ_FAILED",
         { originalError: err },
-        0
+        0,
       );
     }
   }
@@ -349,31 +411,50 @@ export class ExcelReader {
   static async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderDetailedOptions
-  ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
+    options: IExcelReaderDetailedOptions,
+  ): Promise<ExcelReaderDetailedResult>;
   static async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderFlatOptions
-  ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
+    options: IExcelReaderFlatOptions,
+  ): Promise<ExcelReaderFlatResult>;
   static async fromBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options?: IExcelReaderWorksheetOptions
-  ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
+    options?: IExcelReaderWorksheetOptions,
+  ): Promise<ExcelReaderWorksheetResult>;
   static async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options?: IExcelReaderOptions
+    options?: IExcelReaderOptions,
   ): Promise<ExcelReaderResult<T>>;
   static async fromBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any, // Node.js Buffer (preferred) or ArrayBuffer
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const reader = new ExcelReader();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reader.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+    return reader.fromBuffer(buffer, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
+  }
+
+  /**
+   * Convenience static method that always returns the unified payload
+   * exposing `workbook`, `detailed` and `flat` optionally.
+   */
+  static async fromBufferUnified(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderOptions = {},
+  ): Promise<ExcelReaderUnifiedResult> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBuffer(
+      buffer,
+      options as any,
+    ) as Promise<ExcelReaderUnifiedResult>;
   }
 
   /**
@@ -381,23 +462,25 @@ export class ExcelReader {
    */
   static async fromBlob(
     blob: Blob,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   static async fromBlob(
     blob: Blob,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   static async fromBlob(
     blob: Blob,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   static async fromBlob<T extends OutputFormat = OutputFormat.WORKSHEET>(
     blob: Blob,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const reader = new ExcelReader();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reader.fromBlob(blob, options as any) as Promise<ExcelReaderResult<T>>;
+    return reader.fromBlob(blob, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
   }
 
   /**
@@ -405,23 +488,41 @@ export class ExcelReader {
    */
   static async fromFile(
     file: File,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   static async fromFile(
     file: File,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   static async fromFile(
     file: File,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   static async fromFile<T extends OutputFormat = OutputFormat.WORKSHEET>(
     file: File,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const reader = new ExcelReader();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reader.fromFile(file, options as any) as Promise<ExcelReaderResult<T>>;
+    return reader.fromFile(file, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
+  }
+
+  /**
+   * Convenience static method that always returns the unified payload
+   * for File input.
+   */
+  static async fromFileUnified(
+    file: File,
+    options: IExcelReaderOptions = {},
+  ): Promise<ExcelReaderUnifiedResult> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromFile(
+      file,
+      options as any,
+    ) as Promise<ExcelReaderUnifiedResult>;
   }
 
   /**
@@ -431,26 +532,45 @@ export class ExcelReader {
   static async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   static async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   static async fromNodeBuffer(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   static async fromNodeBuffer<T extends OutputFormat = OutputFormat.WORKSHEET>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buffer: any, // Node.js Buffer type (available in Node.js runtime)
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const reader = new ExcelReader();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reader.fromBuffer(buffer, options as any) as Promise<ExcelReaderResult<T>>;
+    return reader.fromBuffer(buffer, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
+  }
+
+  /**
+   * Convenience static method that always returns the unified payload
+   * for Node Buffer input.
+   */
+  static async fromNodeBufferUnified(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buffer: any,
+    options: IExcelReaderOptions = {},
+  ): Promise<ExcelReaderUnifiedResult> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromBuffer(
+      buffer,
+      options as any,
+    ) as Promise<ExcelReaderUnifiedResult>;
   }
 
   /**
@@ -458,23 +578,41 @@ export class ExcelReader {
    */
   static async fromPath(
     filePath: string,
-    options: IExcelReaderDetailedOptions
+    options: IExcelReaderDetailedOptions,
   ): Promise<ExcelReaderResult<OutputFormat.DETAILED>>;
   static async fromPath(
     filePath: string,
-    options: IExcelReaderFlatOptions
+    options: IExcelReaderFlatOptions,
   ): Promise<ExcelReaderResult<OutputFormat.FLAT>>;
   static async fromPath(
     filePath: string,
-    options?: IExcelReaderWorksheetOptions
+    options?: IExcelReaderWorksheetOptions,
   ): Promise<ExcelReaderResult<OutputFormat.WORKSHEET>>;
   static async fromPath<T extends OutputFormat = OutputFormat.WORKSHEET>(
     filePath: string,
-    options: IExcelReaderOptions = {}
+    options: IExcelReaderOptions = {},
   ): Promise<ExcelReaderResult<T>> {
     const reader = new ExcelReader();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return reader.fromPath(filePath, options as any) as Promise<ExcelReaderResult<T>>;
+    return reader.fromPath(filePath, options as any) as Promise<
+      ExcelReaderResult<T>
+    >;
+  }
+
+  /**
+   * Convenience static method that always returns the unified payload
+   * for path input.
+   */
+  static async fromPathUnified(
+    filePath: string,
+    options: IExcelReaderOptions = {},
+  ): Promise<ExcelReaderUnifiedResult> {
+    const reader = new ExcelReader();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return reader.fromPath(
+      filePath,
+      options as any,
+    ) as Promise<ExcelReaderUnifiedResult>;
   }
 
   /**
@@ -482,7 +620,7 @@ export class ExcelReader {
    */
   private convertWorkbookToJson(
     workbook: ExcelJS.Workbook,
-    options: IExcelReaderOptions
+    options: IExcelReaderOptions,
   ): IJsonWorkbook {
     const {
       includeEmptyRows = false,
@@ -495,7 +633,7 @@ export class ExcelReader {
       endColumn,
       includeFormatting = false,
       includeFormulas = false,
-      datesAsISO = true
+      datesAsISO = true,
     } = options;
 
     // Get metadata
@@ -505,14 +643,14 @@ export class ExcelReader {
       company: workbook.company,
       created: workbook.created,
       modified: workbook.modified,
-      description: workbook.description
+      description: workbook.description,
     };
 
     // Filter sheets
     let sheetsToProcess: ExcelJS.Worksheet[] = [];
-    
+
     if (sheetName !== undefined) {
-      if (typeof sheetName === 'number') {
+      if (typeof sheetName === "number") {
         const sheet = workbook.worksheets[sheetName];
         if (sheet) sheetsToProcess.push(sheet);
       } else {
@@ -543,7 +681,7 @@ export class ExcelReader {
         startColumn: startColumn ?? 1,
         includeFormatting: includeFormatting ?? false,
         includeFormulas: includeFormulas ?? false,
-        datesAsISO: datesAsISO ?? true
+        datesAsISO: datesAsISO ?? true,
       };
 
       if (headers !== undefined) {
@@ -561,11 +699,13 @@ export class ExcelReader {
 
     const workbookResult: IJsonWorkbook = {
       sheets,
-      totalSheets: sheets.length
+      totalSheets: sheets.length,
     };
 
     // Only add metadata if it has at least one property
-    const hasMetadata = Object.values(metadata).some(val => val !== undefined && val !== null);
+    const hasMetadata = Object.values(metadata).some(
+      (val) => val !== undefined && val !== null,
+    );
     if (hasMetadata) {
       workbookResult.metadata = metadata;
     }
@@ -589,7 +729,7 @@ export class ExcelReader {
       includeFormatting: boolean;
       includeFormulas: boolean;
       datesAsISO: boolean;
-    }
+    },
   ): IJsonSheet {
     const {
       includeEmptyRows,
@@ -601,7 +741,7 @@ export class ExcelReader {
       endColumn,
       includeFormatting,
       includeFormulas,
-      datesAsISO
+      datesAsISO,
     } = options;
 
     const rows: IJsonRow[] = [];
@@ -610,9 +750,11 @@ export class ExcelReader {
 
     // Determine row range
     const actualStartRow = Math.max(startRow, 1);
-    const actualEndRow = endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
+    const actualEndRow =
+      endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
     const actualStartCol = Math.max(startColumn, 1);
-    const actualEndCol = endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
+    const actualEndCol =
+      endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
 
     // Process rows
     for (let rowNum = actualStartRow; rowNum <= actualEndRow; rowNum++) {
@@ -623,7 +765,7 @@ export class ExcelReader {
       // Process cells in row
       for (let colNum = actualStartCol; colNum <= actualEndCol; colNum++) {
         const cell = excelRow.getCell(colNum);
-        
+
         // Skip if cell is empty and we're not including empty rows
         if (!cell.value && !includeEmptyRows) {
           continue;
@@ -632,7 +774,7 @@ export class ExcelReader {
         const jsonCell = this.convertCellToJson(cell, {
           includeFormatting,
           includeFormulas,
-          datesAsISO
+          datesAsISO,
         });
 
         cells.push(jsonCell);
@@ -651,13 +793,16 @@ export class ExcelReader {
 
       // Handle headers
       if (useFirstRowAsHeaders && rowNum === actualStartRow) {
-        headerRow = cells.map(cell => {
+        headerRow = cells.map((cell) => {
           if (headers && Array.isArray(headers)) {
-            return headers[cells.indexOf(cell)] || String(cell.value || '');
-          } else if (headers && typeof headers === 'object') {
-            return headers[actualStartCol + cells.indexOf(cell)] || String(cell.value || '');
+            return headers[cells.indexOf(cell)] || String(cell.value || "");
+          } else if (headers && typeof headers === "object") {
+            return (
+              headers[actualStartCol + cells.indexOf(cell)] ||
+              String(cell.value || "")
+            );
           }
-          return String(cell.value || '');
+          return String(cell.value || "");
         });
         continue; // Skip header row in data
       }
@@ -674,7 +819,7 @@ export class ExcelReader {
 
       const jsonRow: IJsonRow = {
         rowNumber: rowNum,
-        cells
+        cells,
       };
 
       if (rowData) {
@@ -689,7 +834,7 @@ export class ExcelReader {
       index: worksheet.id || 0,
       rows,
       totalRows: rows.length,
-      totalColumns: maxColumns
+      totalColumns: maxColumns,
     };
 
     if (headerRow) {
@@ -708,7 +853,7 @@ export class ExcelReader {
       includeFormatting: boolean;
       includeFormulas: boolean;
       datesAsISO: boolean;
-    }
+    },
   ): IJsonCell {
     const { includeFormatting, includeFormulas, datesAsISO } = options;
 
@@ -716,49 +861,60 @@ export class ExcelReader {
     let type: string | undefined;
 
     // Determine type and convert value
-    if (cell.type === ExcelJS.ValueType.Null || cell.value === null || cell.value === undefined) {
+    if (
+      cell.type === ExcelJS.ValueType.Null ||
+      cell.value === null ||
+      cell.value === undefined
+    ) {
       value = null;
-      type = 'null';
+      type = "null";
     } else if (cell.type === ExcelJS.ValueType.Number) {
       value = cell.value as number;
-      type = 'number';
+      type = "number";
     } else if (cell.type === ExcelJS.ValueType.String) {
       value = cell.value as string;
-      type = 'string';
+      type = "string";
     } else if (cell.type === ExcelJS.ValueType.Date) {
       const dateValue = cell.value as Date;
       value = datesAsISO ? dateValue.toISOString() : dateValue;
-      type = 'date';
+      type = "date";
     } else if (cell.type === ExcelJS.ValueType.Boolean) {
       value = cell.value as boolean;
-      type = 'boolean';
+      type = "boolean";
     } else if (cell.type === ExcelJS.ValueType.Formula) {
       // Always try to get formula if includeFormulas is true
       if (includeFormulas) {
         value = cell.result || cell.value;
-        type = 'formula';
+        type = "formula";
       } else {
         value = cell.result || cell.value;
-        type = typeof cell.result === 'number' ? 'number' : typeof cell.result === 'string' ? 'string' : 'unknown';
+        type =
+          typeof cell.result === "number"
+            ? "number"
+            : typeof cell.result === "string"
+              ? "string"
+              : "unknown";
       }
     } else if (cell.type === ExcelJS.ValueType.Hyperlink) {
       // Handle hyperlink - ExcelJS stores hyperlinks as objects with text and hyperlink properties
-      const hyperlinkValue = cell.value as { text?: string; hyperlink?: string } | string;
-      if (typeof hyperlinkValue === 'object' && hyperlinkValue !== null) {
+      const hyperlinkValue = cell.value as
+        | { text?: string; hyperlink?: string }
+        | string;
+      if (typeof hyperlinkValue === "object" && hyperlinkValue !== null) {
         value = hyperlinkValue.text || hyperlinkValue.hyperlink || cell.value;
       } else {
         value = hyperlinkValue;
       }
-      type = 'hyperlink';
+      type = "hyperlink";
     } else {
       value = cell.value;
-      type = 'unknown';
+      type = "unknown";
     }
 
     const jsonCell: IJsonCell = {
-      value,
+      value: value as string | number | boolean | Date | null,
       type,
-      reference: cell.address
+      reference: cell.address,
     };
 
     // Add formatted value if requested - use cell.text which is the actual displayed text
@@ -782,15 +938,15 @@ export class ExcelReader {
     if (cell.note) {
       // ExcelJS stores comments as Note objects or strings
       const note = cell.note;
-      if (typeof note === 'string') {
+      if (typeof note === "string") {
         jsonCell.comment = note;
-      } else if (note && typeof note === 'object' && 'texts' in note) {
+      } else if (note && typeof note === "object" && "texts" in note) {
         // Note object with texts array
         const texts = (note as any).texts;
         if (Array.isArray(texts) && texts.length > 0) {
-          jsonCell.comment = texts.map((t: any) => t.text || '').join('');
+          jsonCell.comment = texts.map((t: any) => t.text || "").join("");
         }
-      } else if (note && typeof note === 'object' && 'text' in note) {
+      } else if (note && typeof note === "object" && "text" in note) {
         jsonCell.comment = String((note as any).text);
       }
     }
@@ -803,7 +959,7 @@ export class ExcelReader {
    */
   private convertToDetailedFormat(
     workbook: ExcelJS.Workbook,
-    options: IExcelReaderOptions
+    options: IExcelReaderOptions,
   ): IDetailedFormat {
     const {
       includeEmptyRows = false,
@@ -814,7 +970,7 @@ export class ExcelReader {
       startRow = 1,
       endRow,
       startColumn = 1,
-      endColumn
+      endColumn,
     } = options;
 
     const cells: IDetailedCell[] = [];
@@ -826,14 +982,14 @@ export class ExcelReader {
       company: workbook.company,
       created: workbook.created,
       modified: workbook.modified,
-      description: workbook.description
+      description: workbook.description,
     };
 
     // Filter sheets
     let sheetsToProcess: ExcelJS.Worksheet[] = [];
-    
+
     if (sheetName !== undefined) {
-      if (typeof sheetName === 'number') {
+      if (typeof sheetName === "number") {
         const sheet = workbook.worksheets[sheetName];
         if (sheet) sheetsToProcess.push(sheet);
       } else {
@@ -847,9 +1003,11 @@ export class ExcelReader {
     // Process each sheet
     for (const worksheet of sheetsToProcess) {
       const actualStartRow = Math.max(startRow, 1);
-      const actualEndRow = endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
+      const actualEndRow =
+        endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
       const actualStartCol = Math.max(startColumn, 1);
-      const actualEndCol = endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
+      const actualEndCol =
+        endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
 
       for (let rowNum = actualStartRow; rowNum <= actualEndRow; rowNum++) {
         const excelRow = worksheet.getRow(rowNum);
@@ -864,19 +1022,23 @@ export class ExcelReader {
 
           // Convert column number to letter (1 = A, 2 = B, etc.)
           const columnLetter = this.numberToColumnLetter(colNum);
-          const cellValue = this.getCellValue(cell, { includeFormatting, includeFormulas, datesAsISO });
+          const cellValue = this.getCellValue(cell, {
+            includeFormatting,
+            includeFormulas,
+            datesAsISO,
+          });
 
           // Get the formatted text from ExcelJS (this is the actual displayed text)
-          const cellText = cell.text || String(cellValue.value ?? '');
+          const cellText = cell.text || String(cellValue.value ?? "");
 
           const detailedCell: IDetailedCell = {
-            value: cellValue.value,
+            value: cellValue.value as string | number | boolean | Date | null,
             text: cellText,
             column: colNum,
             columnLetter,
             row: rowNum,
             reference: cell.address || `${columnLetter}${rowNum}`,
-            sheet: worksheet.name
+            sheet: worksheet.name,
           };
 
           // Always include type if available
@@ -886,7 +1048,10 @@ export class ExcelReader {
           // Include formattedValue if includeFormatting is true or if it exists
           if (includeFormatting && cellValue.formattedValue !== undefined) {
             detailedCell.formattedValue = cellValue.formattedValue;
-          } else if (includeFormatting && cellText !== String(cellValue.value ?? '')) {
+          } else if (
+            includeFormatting &&
+            cellText !== String(cellValue.value ?? "")
+          ) {
             // If formatting is requested and text differs from value, use text as formattedValue
             detailedCell.formattedValue = cellText;
           }
@@ -898,15 +1063,17 @@ export class ExcelReader {
           // Add comment if exists
           if (cell.note) {
             const note = cell.note;
-            if (typeof note === 'string') {
+            if (typeof note === "string") {
               detailedCell.comment = note;
-            } else if (note && typeof note === 'object' && 'texts' in note) {
+            } else if (note && typeof note === "object" && "texts" in note) {
               // Note object with texts array
               const texts = (note as any).texts;
               if (Array.isArray(texts) && texts.length > 0) {
-                detailedCell.comment = texts.map((t: any) => t.text || '').join('');
+                detailedCell.comment = texts
+                  .map((t: any) => t.text || "")
+                  .join("");
               }
-            } else if (note && typeof note === 'object' && 'text' in note) {
+            } else if (note && typeof note === "object" && "text" in note) {
               detailedCell.comment = String((note as any).text);
             }
           }
@@ -918,10 +1085,12 @@ export class ExcelReader {
 
     const result: IDetailedFormat = {
       cells,
-      totalCells: cells.length
+      totalCells: cells.length,
     };
 
-    const hasMetadata = Object.values(metadata).some(val => val !== undefined && val !== null);
+    const hasMetadata = Object.values(metadata).some(
+      (val) => val !== undefined && val !== null,
+    );
     if (hasMetadata) {
       result.metadata = metadata;
     }
@@ -934,7 +1103,7 @@ export class ExcelReader {
    */
   private convertToFlatFormat(
     workbook: ExcelJS.Workbook,
-    options: IExcelReaderOptions
+    options: IExcelReaderOptions,
   ): IFlatFormat | IFlatFormatMultiSheet {
     const {
       useFirstRowAsHeaders = false,
@@ -943,7 +1112,7 @@ export class ExcelReader {
       startRow = 1,
       endRow,
       startColumn = 1,
-      endColumn
+      endColumn,
     } = options;
 
     // Get metadata
@@ -953,14 +1122,14 @@ export class ExcelReader {
       company: workbook.company,
       created: workbook.created,
       modified: workbook.modified,
-      description: workbook.description
+      description: workbook.description,
     };
 
     // Filter sheets
     let sheetsToProcess: ExcelJS.Worksheet[] = [];
-    
+
     if (sheetName !== undefined) {
-      if (typeof sheetName === 'number') {
+      if (typeof sheetName === "number") {
         const sheet = workbook.worksheets[sheetName];
         if (sheet) sheetsToProcess.push(sheet);
       } else {
@@ -984,7 +1153,7 @@ export class ExcelReader {
       } = {
         useFirstRowAsHeaders,
         includeEmptyRows,
-        startRow
+        startRow,
       };
 
       if (endRow !== undefined) {
@@ -1003,7 +1172,7 @@ export class ExcelReader {
 
     // Multiple sheets - return multi-sheet format
     const sheets: Record<string, IFlatFormat> = {};
-    
+
     for (const worksheet of sheetsToProcess) {
       const flatOptions: {
         useFirstRowAsHeaders: boolean;
@@ -1015,7 +1184,7 @@ export class ExcelReader {
       } = {
         useFirstRowAsHeaders,
         includeEmptyRows,
-        startRow
+        startRow,
       };
 
       if (endRow !== undefined) {
@@ -1034,10 +1203,12 @@ export class ExcelReader {
 
     const result: IFlatFormatMultiSheet = {
       sheets,
-      totalSheets: Object.keys(sheets).length
+      totalSheets: Object.keys(sheets).length,
     };
 
-    const hasMetadata = Object.values(metadata).some(val => val !== undefined && val !== null);
+    const hasMetadata = Object.values(metadata).some(
+      (val) => val !== undefined && val !== null,
+    );
     if (hasMetadata) {
       result.metadata = metadata;
     }
@@ -1057,7 +1228,7 @@ export class ExcelReader {
       endRow?: number;
       startColumn?: number;
       endColumn?: number;
-    }
+    },
   ): IFlatFormat {
     const {
       useFirstRowAsHeaders,
@@ -1065,13 +1236,15 @@ export class ExcelReader {
       startRow,
       endRow,
       startColumn,
-      endColumn
+      endColumn,
     } = options;
 
     const actualStartRow = Math.max(startRow, 1);
-    const actualEndRow = endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
+    const actualEndRow =
+      endRow || worksheet.rowCount || worksheet.lastRow?.number || 1;
     const actualStartCol = Math.max(startColumn || 1, 1);
-    const actualEndCol = endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
+    const actualEndCol =
+      endColumn || worksheet.columnCount || worksheet.lastColumn?.number || 1;
 
     const data: Array<Record<string, unknown> | unknown[]> = [];
     let headers: string[] | undefined;
@@ -1087,8 +1260,10 @@ export class ExcelReader {
     }
 
     // Process data rows
-    const dataStartRow = useFirstRowAsHeaders ? actualStartRow + 1 : actualStartRow;
-    
+    const dataStartRow = useFirstRowAsHeaders
+      ? actualStartRow + 1
+      : actualStartRow;
+
     for (let rowNum = dataStartRow; rowNum <= actualEndRow; rowNum++) {
       const excelRow = worksheet.getRow(rowNum);
       const rowValues: unknown[] = [];
@@ -1096,9 +1271,17 @@ export class ExcelReader {
 
       for (let colNum = actualStartCol; colNum <= actualEndCol; colNum++) {
         const cell = excelRow.getCell(colNum);
-        const cellValue = this.getCellValue(cell, { includeFormatting: false, includeFormulas: false, datesAsISO: true });
+        const cellValue = this.getCellValue(cell, {
+          includeFormatting: false,
+          includeFormulas: false,
+          datesAsISO: true,
+        });
         rowValues.push(cellValue.value);
-        if (cellValue.value !== null && cellValue.value !== undefined && cellValue.value !== '') {
+        if (
+          cellValue.value !== null &&
+          cellValue.value !== undefined &&
+          cellValue.value !== ""
+        ) {
           hasData = true;
         }
       }
@@ -1123,7 +1306,7 @@ export class ExcelReader {
     const result: IFlatFormat = {
       data,
       totalRows: data.length,
-      sheet: worksheet.name
+      sheet: worksheet.name,
     };
 
     if (headers) {
@@ -1142,7 +1325,7 @@ export class ExcelReader {
       includeFormatting: boolean;
       includeFormulas: boolean;
       datesAsISO: boolean;
-    }
+    },
   ): {
     value: unknown;
     type?: string;
@@ -1156,46 +1339,57 @@ export class ExcelReader {
     let formattedValue: string | undefined;
     let formula: string | undefined;
 
-    if (cell.type === ExcelJS.ValueType.Null || cell.value === null || cell.value === undefined) {
+    if (
+      cell.type === ExcelJS.ValueType.Null ||
+      cell.value === null ||
+      cell.value === undefined
+    ) {
       value = null;
-      type = 'null';
+      type = "null";
     } else if (cell.type === ExcelJS.ValueType.Number) {
       value = cell.value as number;
-      type = 'number';
+      type = "number";
     } else if (cell.type === ExcelJS.ValueType.String) {
       value = cell.value as string;
-      type = 'string';
+      type = "string";
     } else if (cell.type === ExcelJS.ValueType.Date) {
       const dateValue = cell.value as Date;
       value = datesAsISO ? dateValue.toISOString() : dateValue;
-      type = 'date';
+      type = "date";
     } else if (cell.type === ExcelJS.ValueType.Boolean) {
       value = cell.value as boolean;
-      type = 'boolean';
+      type = "boolean";
     } else if (cell.type === ExcelJS.ValueType.Formula) {
       // Always try to get formula if includeFormulas is true
       if (includeFormulas) {
         formula = cell.formula || undefined;
         value = cell.result || cell.value;
-        type = 'formula';
+        type = "formula";
       } else {
         value = cell.result || cell.value;
-        type = typeof cell.result === 'number' ? 'number' : typeof cell.result === 'string' ? 'string' : 'unknown';
+        type =
+          typeof cell.result === "number"
+            ? "number"
+            : typeof cell.result === "string"
+              ? "string"
+              : "unknown";
       }
     } else if (includeFormulas && cell.formula) {
       // Some cells might have formulas even if type is not Formula
       formula = cell.formula;
     } else if (cell.type === ExcelJS.ValueType.Hyperlink) {
-      const hyperlinkValue = cell.value as { text?: string; hyperlink?: string } | string;
-      if (typeof hyperlinkValue === 'object' && hyperlinkValue !== null) {
+      const hyperlinkValue = cell.value as
+        | { text?: string; hyperlink?: string }
+        | string;
+      if (typeof hyperlinkValue === "object" && hyperlinkValue !== null) {
         value = hyperlinkValue.text || hyperlinkValue.hyperlink || cell.value;
       } else {
         value = hyperlinkValue;
       }
-      type = 'hyperlink';
+      type = "hyperlink";
     } else {
       value = cell.value;
-      type = 'unknown';
+      type = "unknown";
     }
 
     // Get formatted value - use cell.text which is the actual displayed text in Excel
@@ -1208,7 +1402,7 @@ export class ExcelReader {
       value,
       type,
       ...(formattedValue !== undefined && { formattedValue }),
-      ...(formula !== undefined && { formula })
+      ...(formula !== undefined && { formula }),
     };
   }
 
@@ -1216,7 +1410,7 @@ export class ExcelReader {
    * Convert column number to letter (1 = A, 2 = B, 27 = AA, etc.)
    */
   private numberToColumnLetter(columnNumber: number): string {
-    let result = '';
+    let result = "";
     while (columnNumber > 0) {
       columnNumber--;
       result = String.fromCharCode(65 + (columnNumber % 26)) + result;

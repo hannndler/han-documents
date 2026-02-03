@@ -546,13 +546,24 @@ export class ExcelBuilder implements
       // Dynamic import of Node.js modules to avoid issues in browser builds
       const nodeModules = await (async () => {
         try {
-          // @ts-ignore - Dynamic import for Node.js only
-          const fs = await import('fs/promises');
-          // @ts-ignore - Dynamic import for Node.js only
-          const path = await import('path');
-          // @ts-ignore - Dynamic import for Node.js only
-          const buffer = await import('buffer');
-          return { fs, path, Buffer: buffer.Buffer };
+          // Prefer require() at runtime when available to avoid Vite externalization
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const fsReq = typeof require === 'function' ? (require as any)('fs/promises') : undefined;
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const pathReq = typeof require === 'function' ? (require as any)('path') : undefined;
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const bufferReq = typeof require === 'function' ? (require as any)('buffer') : undefined;
+
+          const fsMod = fsReq ?? (await import('fs/promises'));
+          const pathMod = pathReq ?? (await import('path'));
+          const bufferMod = bufferReq ?? (await import('buffer'));
+
+          // Some bundlers/targets may wrap CommonJS modules under a `.default` property.
+          const fs = (fsMod as any).default ?? fsMod;
+          const path = (pathMod as any).default ?? pathMod;
+          const Buffer = (bufferMod as any).default?.Buffer ?? (bufferMod as any).Buffer ?? (bufferMod as any);
+
+          return { fs, path, Buffer };
         } catch {
           throw new Error('Node.js modules not available. saveToFile() requires Node.js environment.');
         }

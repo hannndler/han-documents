@@ -385,8 +385,18 @@ export class PDFBuilder implements
       // Type assertions needed because these modules don't have types in browser context
       type NodeFS = typeof import('fs/promises');
       type NodePath = typeof import('path');
-      const fs = (await import('fs/promises')) as unknown as NodeFS;
-      const path = (await import('path')) as unknown as NodePath;
+      // Prefer runtime require() to avoid bundler externalization in builds
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const fsReq = typeof require === 'function' ? (require as any)('fs/promises') : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pathReq = typeof require === 'function' ? (require as any)('path') : undefined;
+
+      const fsMod = fsReq ?? (await import('fs/promises'));
+      const pathMod = pathReq ?? (await import('path'));
+
+      // Normalize modules in case bundler wraps them under `.default`
+      const fs = (fsMod as any).default ?? (fsMod as unknown as NodeFS);
+      const path = (pathMod as any).default ?? (pathMod as unknown as NodePath);
       
       // Create directory if needed
       if (options.createDir !== false) {
