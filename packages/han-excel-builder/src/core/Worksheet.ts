@@ -1400,25 +1400,18 @@ export class Worksheet implements IWorksheet {
 
     // Manejo de mergeAs: copiar la estructura de merge de otra celda (horizontal o vertical)
     if ((row as any).mergeAs && (row as any).mergeAs.fromKey) {
-      const sourceKey = (row as any).mergeAs.fromKey as string;
-
-      // Buscar SOLO la fila en el array de contexto y copiar el length de sus children
-      let sourceRow: IDataCell | IHeaderCell | IFooterCell | undefined;
-      if (contextRows && contextRows.length > 0) {
-        for (let idx = 0; idx < contextRows.length; idx++) {
-          const r = contextRows[idx];
-          if (!r) continue;
-          if ((r as any).key === sourceKey) { sourceRow = r as any; break; }
-        }
-      }
-
-      // Si no se encuentra, usar la fila actual como fallback
-      if (!sourceRow) {
-        sourceRow = row as any;
-      }
-
-      const children = (sourceRow as any).children as Array<any> | undefined;
-      const spanRows = Math.max(1, children && children.length > 0 ? children.length : 1);
+      // Buscar SOLO en su propia row (evita errores al continuar con la siguiente fila)
+      const children = (row as any).children as Array<any> | undefined;
+      const explicitRows = Number((row as any).mergeAs?.rows);
+      const jumpCount = children && children.length > 0
+        ? children.reduce((acc, c) => acc + (c && c.jump ? 1 : 0), 0)
+        : 0;
+      const spanRows = Math.max(
+        1,
+        Number.isFinite(explicitRows) && explicitRows > 0
+          ? explicitRows
+          : (jumpCount || (children && children.length > 0 ? children.length : 1))
+      );
       const endRowCopy = rowPointer + spanRows - 1;
       this.safeMerge(ws, rowPointer, mainColPosition, endRowCopy, mainColPosition);
     } else {
