@@ -117,6 +117,21 @@ export interface IBaseCell {
   colWidth?: number;
   /** Whether to move to next row after this cell */
   jump?: boolean;
+  /**
+   * Copy merge configuration from another cell in the same data structure.
+   * Example: { fromKey: 'otherColumnKey' } will copy the merge settings
+   * from the cell with key 'otherColumnKey' into this cell when rendering.
+   */
+  mergeAs?: {
+    /** Key of the source cell to copy merge from */
+    fromKey?: string;
+    /**
+     * Tipo de merge a copiar: 'horizontal' copiará `mergeTo` (merge en la misma fila),
+     * 'vertical' copiará el span vertical calculado por `calculateRowSpan`.
+     * Si no se especifica, el comportamiento intenta inferir (vertical preferido).
+     */
+    type?: 'horizontal' | 'vertical';
+  };
   /** Hyperlink URL */
   link?: string;
   /** Text mask for hyperlink (displayed text when link is present) */
@@ -153,6 +168,8 @@ export interface IDataValidation {
   type: 'list' | 'whole' | 'decimal' | 'textLength' | 'date' | 'time' | 'custom';
   /** Validation operator */
   operator?: 'between' | 'notBetween' | 'equal' | 'notEqual' | 'greaterThan' | 'lessThan' | 'greaterThanOrEqual' | 'lessThanOrEqual';
+  /** List values for dropdowns (used when type is 'list') */
+  values?: Array<string | number>;
   /** Validation formula or values */
   formula1?: string | number | Date;
   /** Second validation formula or value (for between/notBetween) */

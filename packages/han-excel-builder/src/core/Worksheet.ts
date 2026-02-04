@@ -506,15 +506,16 @@ export class Worksheet implements IWorksheet {
     
     // Body (soporta children)
     if (table.body && table.body.length > 0) {
-      for (const row of table.body) {
-        rowPointer = this.addDataRowRecursive(ws, rowPointer, row);
-      }
+      for (let i = 0; i < table.body.length; i++) {
+          const row = table.body[i];
+          rowPointer = this.addDataRowRecursive(ws, rowPointer, row, table.body, i, table.subHeaders);
+        }
     }
     
     // Footers
     if (table.footers && table.footers.length > 0) {
       for (const footer of table.footers) {
-        rowPointer = this.addFooterRow(ws, rowPointer, footer);
+        rowPointer = this.addFooterRow(ws, rowPointer, footer, table.subHeaders);
       }
     }
     
@@ -571,14 +572,15 @@ export class Worksheet implements IWorksheet {
     }
     
     // Body (soporta children)
-    for (const row of this.body) {
-      rowPointer = this.addDataRowRecursive(ws, rowPointer, row);
+    for (let i = 0; i < this.body.length; i++) {
+      const row = this.body[i];
+      rowPointer = this.addDataRowRecursive(ws, rowPointer, row, this.body, i, this.subHeaders);
     }
     
     // Footers
     if (this.footers.length > 0) {
       for (const footer of this.footers) {
-        rowPointer = this.addFooterRow(ws, rowPointer, footer);
+        rowPointer = this.addFooterRow(ws, rowPointer, footer, this.subHeaders);
       }
     }
     
@@ -887,11 +889,12 @@ export class Worksheet implements IWorksheet {
   /**
    * Calcula las posiciones de columnas para los datos basándose en la estructura de subheaders
    */
-  private calculateDataColumnPositions(): { [key: string]: number } {
+  private calculateDataColumnPositions(subHeaders?: IHeaderCell[]): { [key: string]: number } {
     const positions: { [key: string]: number } = {};
     let currentCol = 1;
-    
-    for (const header of this.subHeaders) {
+
+    const headers = subHeaders && subHeaders.length > 0 ? subHeaders : this.subHeaders;
+    for (const header of headers) {
       if (header.children && header.children.length > 0) {
         // Si el header tiene children, cada child ocupa una columna
         for (const child of header.children) {
@@ -922,9 +925,9 @@ export class Worksheet implements IWorksheet {
    * Agrega una fila de footer
    * @returns el siguiente rowPointer disponible
    */
-  private addFooterRow(ws: ExcelJS.Worksheet, rowPointer: number, footer: IFooterCell): number {
+  private addFooterRow(ws: ExcelJS.Worksheet, rowPointer: number, footer: IFooterCell, contextSubHeaders?: IHeaderCell[]): number {
     // Calcular las columnas basándose en la estructura de subheaders
-    const columnPositions = this.calculateDataColumnPositions();
+    const columnPositions = this.calculateDataColumnPositions(contextSubHeaders);
     
     // Buscar la columna correcta para el footer
     let footerColPosition: number | undefined;
@@ -1099,7 +1102,13 @@ export class Worksheet implements IWorksheet {
     }
 
     // Agregar fórmulas/valores
-    if (validation.formula1 !== undefined) {
+    if (validation.type === 'list' && validation.values && validation.values.length > 0) {
+      // Excel list formula: "A,B,C"
+      const escaped = validation.values
+        .map(v => String(v).replace(/"/g, '""'))
+        .join(',');
+      dataValidation.formulae = [`"${escaped}"`];
+    } else if (validation.formula1 !== undefined) {
       if (typeof validation.formula1 === 'string') {
         dataValidation.formulae = [validation.formula1];
       } else if (validation.formula1 instanceof Date) {
@@ -1315,9 +1324,16 @@ export class Worksheet implements IWorksheet {
    * Agrega una fila de datos y sus children recursivamente
    * @returns el siguiente rowPointer disponible
    */
-  private addDataRowRecursive(ws: ExcelJS.Worksheet, rowPointer: number, row: IDataCell): number {
+  private addDataRowRecursive(
+    ws: ExcelJS.Worksheet,
+    rowPointer: number,
+    row: IDataCell,
+    contextRows?: IDataCell[],
+    contextIndex?: number,
+    contextSubHeaders?: IHeaderCell[]
+  ): number {
     // Calcular las columnas basándose en la estructura de subheaders
-    const columnPositions = this.calculateDataColumnPositions();
+    const columnPositions = this.calculateDataColumnPositions(contextSubHeaders);
 
     // Buscar la columna correcta para el dato principal
     let mainColPosition: number | undefined;
@@ -1376,6 +1392,44 @@ export class Worksheet implements IWorksheet {
     }
     if (row.numberFormat) {
       mainCell.numFmt = row.numberFormat;
+    }
+
+    // Calcular cuántas filas ocuparán esta fila y sus childrens (incluye la fila principal)
+    const rowsNeeded = this.calculateRowSpan(row);
+    const endRow = rowPointer + Math.max(1, rowsNeeded) - 1;
+
+    // Manejo de mergeAs: copiar la estructura de merge de otra celda (horizontal o vertical)
+    if ((row as any).mergeAs && (row as any).mergeAs.fromKey) {
+      const sourceKey = (row as any).mergeAs.fromKey as string;
+
+      // Buscar SOLO la fila en el array de contexto y copiar el length de sus children
+      let sourceRow: IDataCell | IHeaderCell | IFooterCell | undefined;
+      if (contextRows && contextRows.length > 0) {
+        for (let idx = 0; idx < contextRows.length; idx++) {
+          const r = contextRows[idx];
+          if (!r) continue;
+          if ((r as any).key === sourceKey) { sourceRow = r as any; break; }
+        }
+      }
+
+      // Si no se encuentra, usar la fila actual como fallback
+      if (!sourceRow) {
+        sourceRow = row as any;
+      }
+
+      const children = (sourceRow as any).children as Array<any> | undefined;
+      const spanRows = Math.max(1, children && children.length > 0 ? children.length : 1);
+      const endRowCopy = rowPointer + spanRows - 1;
+      this.safeMerge(ws, rowPointer, mainColPosition, endRowCopy, mainColPosition);
+    } else {
+      // Si no hay mergeAs, comportamiento legacy: merge si mergeCell está definido
+        if ((row as any).mergeCell && (row as any).mergeTo) {
+          if (rowsNeeded > 1) this.safeMerge(ws, rowPointer, mainColPosition, endRow, (row as any).mergeTo);
+          else this.safeMerge(ws, rowPointer, mainColPosition, rowPointer, (row as any).mergeTo);
+        } else if (rowsNeeded > 1) {
+          // Merge vertical en la misma columna
+          this.safeMerge(ws, rowPointer, mainColPosition, endRow, mainColPosition);
+        }
     }
     
     // Aplicar protección de celda si existe
@@ -1460,6 +1514,24 @@ export class Worksheet implements IWorksheet {
     return rowPointer;
   }
 
+    /**
+     * Merge helper that avoids attempting to merge a range that's already merged.
+     */
+    private safeMerge(ws: ExcelJS.Worksheet, startRow: number, startCol: number, endRow: number, endCol: number): void {
+      try {
+        const startColLetter = this.numberToColumnLetter(startCol);
+        const endColLetter = this.numberToColumnLetter(endCol);
+        const range = `${startColLetter}${startRow}:${endColLetter}${endRow}`;
+        // exceljs stores merges in a Map-like structure on the worksheet
+        if ((ws as any)._merges && typeof (ws as any)._merges.has === 'function') {
+          if ((ws as any)._merges.has(range)) return;
+        }
+        ws.mergeCells(startRow, startCol, endRow, endCol);
+      } catch (e) {
+        // Ignore merge errors (e.g., overlapping/duplicate merges)
+      }
+    }
+
   /**
    * Convierte un color a formato ExcelJS (ARGB)
    */
@@ -1502,6 +1574,47 @@ export class Worksheet implements IWorksheet {
       return color;
     }
     
+    return undefined;
+  }
+
+  /**
+   * Calcula cuántas filas ocupará una celda considerando children y jumps.
+   */
+  private calculateRowSpan(row: IDataCell | IHeaderCell | IFooterCell): number {
+    if (!row) return 1;
+    let span = 1;
+    const children = (row as any).children as Array<any> | undefined;
+    if (!children || children.length === 0) return span;
+
+    // Contar filas adicionales introducidas por children con `jump`
+    let current = 1;
+    for (const c of children) {
+      if (!c) continue;
+      const childSpan = this.calculateRowSpan(c as IDataCell);
+      if (c.jump) {
+        current = Math.max(current, 1) + childSpan;
+      } else {
+        current = Math.max(current, childSpan);
+      }
+    }
+    span = Math.max(span, current);
+    return span;
+  }
+
+  /**
+   * Busca recursivamente una celda (por key) dentro de una definición de fila/header/footer
+   */
+  private findCellInRow(row: IDataCell | IHeaderCell | IFooterCell, key: string): IDataCell | IHeaderCell | IFooterCell | undefined {
+    if (!row) return undefined;
+    if ((row as any).key === key) return row as any;
+    const children = (row as any).children as Array<any> | undefined;
+    if (!children || children.length === 0) return undefined;
+    for (const c of children) {
+      if (!c) continue;
+      if (c.key === key) return c;
+      const found = this.findCellInRow(c, key);
+      if (found) return found;
+    }
     return undefined;
   }
 

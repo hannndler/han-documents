@@ -249,6 +249,8 @@ export interface IStyleBuilder {
   rightAlign(): IStyleBuilder;
   /** Wrap text */
   wrapText(): IStyleBuilder;
+  /** Enable/disable shrink-to-fit */
+  shrinkToFit(enabled?: boolean): IStyleBuilder;
   /** Set number format */
   numberFormat(format: string): IStyleBuilder;
   /** Set striped rows */

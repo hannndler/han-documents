@@ -181,6 +181,15 @@ export class StyleBuilder implements IStyleBuilderInterface {
     return this;
   }
 
+  /** Enable or disable shrink-to-fit */
+  shrinkToFit(enabled: boolean = true): StyleBuilder {
+    if (!this.style.alignment) {
+      this.style.alignment = {};
+    }
+    this.style.alignment.shrinkToFit = Boolean(enabled);
+    return this;
+  }
+
   numberFormat(format: string): StyleBuilder {
     this.style.numberFormat = format;
     return this;
