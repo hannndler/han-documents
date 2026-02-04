@@ -1400,19 +1400,35 @@ export class Worksheet implements IWorksheet {
 
     // Manejo de mergeAs: copiar la estructura de merge de otra celda (horizontal o vertical)
     if ((row as any).mergeAs && (row as any).mergeAs.fromKey) {
-      // Buscar SOLO en su propia row (evita errores al continuar con la siguiente fila)
-      const children = (row as any).children as Array<any> | undefined;
       const explicitRows = Number((row as any).mergeAs?.rows);
-      const jumpCount = children && children.length > 0
-        ? children.reduce((acc, c) => acc + (c && c.jump ? 1 : 0), 0)
-        : 0;
-      const spanRows = Math.max(
-        1,
-        Number.isFinite(explicitRows) && explicitRows > 0
-          ? explicitRows
-          : (jumpCount || (children && children.length > 0 ? children.length : 1))
-      );
-      const endRowCopy = rowPointer + spanRows - 1;
+      let spanRows: number | undefined;
+
+      if (Number.isFinite(explicitRows) && explicitRows >= 0) {
+        // rows = number of additional rows (exclude current row)
+        spanRows = explicitRows + 1;
+      } else if (contextRows && typeof contextIndex === 'number') {
+        // Buscar SOLO la fila siguiente inmediata (evita recorrer otras filas)
+        const nextRow = contextRows[contextIndex + 1];
+        if (nextRow && (nextRow as any).key === (row as any).mergeAs.fromKey) {
+          const nextChildren = (nextRow as any).children as Array<any> | undefined;
+          const jumpCount = nextChildren && nextChildren.length > 0
+            ? nextChildren.reduce((acc, c) => acc + (c && c.jump ? 1 : 0), 0)
+            : 0;
+          spanRows = jumpCount || (nextChildren && nextChildren.length > 0 ? nextChildren.length : 1);
+        }
+      }
+
+      if (spanRows === undefined) {
+        // Fallback: usar la propia row
+        const children = (row as any).children as Array<any> | undefined;
+        const jumpCount = children && children.length > 0
+          ? children.reduce((acc, c) => acc + (c && c.jump ? 1 : 0), 0)
+          : 0;
+        spanRows = jumpCount || (children && children.length > 0 ? children.length : 1);
+      }
+
+      const safeSpan = spanRows ?? 1;
+      const endRowCopy = rowPointer + Math.max(1, safeSpan) - 1;
       this.safeMerge(ws, rowPointer, mainColPosition, endRowCopy, mainColPosition);
     } else {
       // Si no hay mergeAs, comportamiento legacy: merge si mergeCell está definido
@@ -1456,6 +1472,7 @@ export class Worksheet implements IWorksheet {
     
     // Si hay children, escribirlos en las columnas correspondientes
     if (row.children && row.children.length > 0) {
+      let childRowPointer = rowPointer;
       for (const child of row.children) {
         if (child) {
           // Buscar la columna correcta basándose en el header del child
@@ -1471,7 +1488,8 @@ export class Worksheet implements IWorksheet {
           }
           
           if (colPosition !== undefined) {
-            const childCell = excelRow.getCell(colPosition);
+            const childExcelRow = ws.getRow(childRowPointer);
+            const childCell = childExcelRow.getCell(colPosition);
             childCell.value = this.processCellValue(child);
             if (child.styles) {
               childCell.style = this.convertStyle(child.styles);
@@ -1479,21 +1497,33 @@ export class Worksheet implements IWorksheet {
             if (child.numberFormat) {
               childCell.numFmt = child.numberFormat;
             }
+
+            // Support mergeAs on child cells (rows only, vertical)
+            if ((child as any).mergeAs && (child as any).mergeAs.rows !== undefined) {
+              const explicitRows = Number((child as any).mergeAs.rows);
+              const spanRows = Number.isFinite(explicitRows) && explicitRows >= 0 ? explicitRows + 1 : 1;
+              const endRowCopy = childRowPointer + Math.max(1, spanRows) - 1;
+              this.safeMerge(ws, childRowPointer, colPosition, endRowCopy, colPosition);
+            }
             
             // Aplicar dimensiones de celda para children
-            this.applyCellDimensions(ws, rowPointer, colPosition, child);
+            this.applyCellDimensions(ws, childRowPointer, colPosition, child);
             // Aplicar comentario si existe
             if (child.comment) {
-              this.applyCellComment(ws, rowPointer, colPosition, child.comment);
+              this.applyCellComment(ws, childRowPointer, colPosition, child.comment);
             }
             // Aplicar validación de datos si existe
             if (child.validation) {
-              this.applyDataValidation(ws, rowPointer, colPosition, child.validation);
+              this.applyDataValidation(ws, childRowPointer, colPosition, child.validation);
             }
             // Aplicar formato condicional si existe
             if (child.styles?.conditionalFormats) {
-              this.applyConditionalFormatting(ws, rowPointer, colPosition, child.styles.conditionalFormats);
+              this.applyConditionalFormatting(ws, childRowPointer, colPosition, child.styles.conditionalFormats);
             }
+          }
+
+          if (child.jump) {
+            childRowPointer += 1;
           }
         }
       }

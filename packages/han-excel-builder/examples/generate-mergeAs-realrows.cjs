@@ -12,8 +12,9 @@ const CellType = dist.CellType;
     subHeaders: [
       { key: 'item', value: 'Item' },
       { key: 'supplier', value: 'Supplier' },
-      { key: 'note1', value: 'Note 1' },
-      { key: 'note2', value: 'Note 2' }
+      { key: 'itemName', value: 'Rubro' },
+      { key: 'contractedAmount', value: 'Cantidad' },
+      { key: 'totalKilos', value: 'Total Kilos' }
     ],
     body: [],
     footers: [],
@@ -21,33 +22,57 @@ const CellType = dist.CellType;
     showStripes: false,
   };
 
-  // Simulando tu estructura: item (destino) antes de supplier (source)
-  const index = 1;
-  const supplier = { name: 'Supplier Co' };
-  const supplierStyle = undefined;
-  const childRow = [
-    { key: 'note1', header: 'note1', value: 'Line 1', type: CellType.STRING, jump: true },
-    { key: 'note2', header: 'note2', value: 'Line 2', type: CellType.STRING }
-  ];
+  // Simulando estructura real con muchos proveedores y items
+  const suppliers = Array.from({ length: 20 }).map((_, i) => ({ name: `Supplier ${i + 1}` }));
+  const items = Array.from({ length: 8 }).map((_, i) => ({ name: `Item ${i + 1}` }));
 
-  table.body.push({
-    header: 'item',
-    key: 'item',
-    value: index,
-    type: CellType.NUMBER,
-    validation: { type: 'list', values: ['1', '2', '3'] },
-    mergeAs: { fromKey: 'supplier' },
-  });
+  suppliers.forEach((supplier, index) => {
+    items.forEach((item, itemIndex) => {
+      const children = [
+        {
+          header: 'contractedAmount',
+          value: 0,
+          key: 'contractedAmount',
+          type: CellType.NUMBER,
+        },
+        {
+          header: 'totalKilos',
+          value: 0,
+          key: 'totalKilos',
+          type: CellType.NUMBER,
+        }
+      ];
 
-  table.body.push({
-    header: 'supplier',
-    value: supplier.name,
-    key: 'supplier',
-    type: CellType.STRING,
-    mergeCell: false,
-    children: childRow,
-    styles: supplierStyle,
-    jump: false,
+      if (itemIndex === 0) {
+        children.unshift(
+          {
+            header: 'supplier',
+            value: supplier.name,
+            key: 'supplier',
+            type: CellType.STRING,
+            mergeAs: { rows: items.length - 1 },
+          }
+        );
+        children.unshift(
+          {
+            header: 'item',
+            key: 'item',
+            value: index + 1,
+            type: CellType.NUMBER,
+            mergeAs: { rows: items.length - 1 },
+          }
+        );
+      }
+
+      table.body.push({
+        header: 'itemName',
+        key: 'itemName',
+        value: item.name,
+        type: CellType.STRING,
+        jump: true,
+        children
+      });
+    });
   });
 
   const ws = builder.addWorksheet('Sheet1');

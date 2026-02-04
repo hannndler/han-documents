@@ -125,7 +125,7 @@ export interface IBaseCell {
   mergeAs?: {
     /** Key of the source cell to copy merge from */
     fromKey?: string;
-    /** Row span to merge vertically (overrides children/jump-based span). */
+    /** Number of additional rows to merge vertically (excludes current row). */
     rows?: number;
     /**
      * Tipo de merge a copiar: 'horizontal' copiará `mergeTo` (merge en la misma fila),
